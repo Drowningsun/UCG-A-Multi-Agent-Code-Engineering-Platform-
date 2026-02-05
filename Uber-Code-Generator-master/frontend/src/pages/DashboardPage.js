@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
+import ConfirmModal from '../components/ConfirmModal';
 import './DashboardPage.css';
 
 const DashboardPage = () => {
@@ -10,6 +11,19 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedSessions, setSelectedSessions] = useState(new Set());
+  
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'danger'
+  });
+  
+  const closeConfirmModal = () => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+  };
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -55,50 +69,77 @@ const DashboardPage = () => {
     }
   };
 
-  const deleteSelectedSessions = async () => {
+  const deleteSelectedSessions = () => {
     if (selectedSessions.size === 0) return;
-    if (!window.confirm(`Delete ${selectedSessions.size} selected session(s)?`)) return;
     
-    try {
-      await authAxios.post('/sessions/bulk-delete', {
-        session_ids: Array.from(selectedSessions)
-      });
-      setSessions(prev => prev.filter(s => !selectedSessions.has(s.session_id)));
-      setSelectedSessions(new Set());
-      setSelectMode(false);
-    } catch (error) {
-      console.error('Error deleting sessions:', error);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Selected Sessions',
+      message: `Are you sure you want to delete ${selectedSessions.size} selected session(s)? This action cannot be undone.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await authAxios.post('/sessions/bulk-delete', {
+            session_ids: Array.from(selectedSessions)
+          });
+          setSessions(prev => prev.filter(s => !selectedSessions.has(s.session_id)));
+          setSelectedSessions(new Set());
+          setSelectMode(false);
+        } catch (error) {
+          console.error('Error deleting sessions:', error);
+        }
+      }
+    });
   };
 
-  const cleanupEmptySessions = async () => {
+  const cleanupEmptySessions = () => {
     const emptySessions = sessions.filter(s => s.message_count === 0);
     if (emptySessions.length === 0) {
-      alert('No empty sessions to clean up!');
+      setConfirmModal({
+        isOpen: true,
+        title: 'No Empty Sessions',
+        message: 'There are no empty sessions to clean up.',
+        variant: 'info',
+        onConfirm: () => {}
+      });
       return;
     }
-    if (!window.confirm(`Delete ${emptySessions.length} empty session(s)?`)) return;
     
-    try {
-      const response = await authAxios.post('/sessions/cleanup-empty');
-      setSessions(prev => prev.filter(s => s.message_count > 0));
-      alert(`Cleaned up ${response.data.deleted_count} empty sessions`);
-    } catch (error) {
-      console.error('Error cleaning up sessions:', error);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Clean Up Empty Sessions',
+      message: `Are you sure you want to delete ${emptySessions.length} empty session(s)? This action cannot be undone.`,
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          await authAxios.post('/sessions/cleanup-empty');
+          setSessions(prev => prev.filter(s => s.message_count > 0));
+        } catch (error) {
+          console.error('Error cleaning up sessions:', error);
+        }
+      }
+    });
   };
 
-  const deleteSession = async (sessionId, e) => {
+  const deleteSession = (sessionId, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm('Delete this session?')) return;
     
-    try {
-      await authAxios.delete(`/sessions/${sessionId}`);
-      setSessions(prev => prev.filter(s => s.session_id !== sessionId));
-    } catch (error) {
-      console.error('Error deleting session:', error);
-    }
+    const session = sessions.find(s => s.session_id === sessionId);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Session',
+      message: `Are you sure you want to delete "${session?.title || 'New Chat'}"? This action cannot be undone.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await authAxios.delete(`/sessions/${sessionId}`);
+          setSessions(prev => prev.filter(s => s.session_id !== sessionId));
+        } catch (error) {
+          console.error('Error deleting session:', error);
+        }
+      }
+    });
   };
 
   const formatDate = (dateString) => {
@@ -350,6 +391,18 @@ const DashboardPage = () => {
           </section>
         </div>
       </main>
+      
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.variant === 'info' ? 'OK' : 'Delete'}
+        cancelText={confirmModal.variant === 'info' ? 'Close' : 'Cancel'}
+      />
     </div>
   );
 };

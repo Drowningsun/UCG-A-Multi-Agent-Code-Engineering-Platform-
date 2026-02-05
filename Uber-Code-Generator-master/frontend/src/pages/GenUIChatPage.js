@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
+import UsageLimitModal from '../components/UsageLimitModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Card,
@@ -37,7 +38,10 @@ const fadeInUp = {
 const GenUIChatPage = () => {
   const { sessionId: urlSessionId } = useParams();
   const navigate = useNavigate();
-  const { authAxios, token } = useAuth();
+  const { authAxios, token, isAuthenticated, hasReachedGuestLimit, incrementGuestUsage } = useAuth();
+  
+  // Guest usage limit modal
+  const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
   
   // Session state
   const [sessionId, setSessionId] = useState(urlSessionId || null);
@@ -91,10 +95,17 @@ const GenUIChatPage = () => {
       sessionCreatedRef.current = true;
     } else if (!sessionCreatedRef.current) {
       sessionCreatedRef.current = true;
-      createSession();
+      // For guests, create a local-only session
+      if (!isAuthenticated) {
+        const localSessionId = `guest-${Date.now()}`;
+        setSessionId(localSessionId);
+        setSessionTitle('Guest Chat');
+      } else {
+        createSession();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlSessionId]);
+  }, [urlSessionId, isAuthenticated]);
   
   // Load session data
   useEffect(() => {
@@ -129,6 +140,20 @@ const GenUIChatPage = () => {
   };
   
   const createSession = async () => {
+    // For guests, create a local-only session (no server call)
+    if (!isAuthenticated) {
+      const localSessionId = `guest-${Date.now()}`;
+      setSessionId(localSessionId);
+      setSessionTitle('Guest Chat');
+      setMessages([]);
+      setPrompt('');
+      setResult(null);
+      setStreamingCode('');
+      resetAGUI();
+      sessionCreatedRef.current = true;
+      return;
+    }
+    
     try {
       const response = await authAxios.post('/sessions');
       const newSessionId = response.data.session_id;
@@ -150,6 +175,12 @@ const GenUIChatPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim() || loading) return;
+    
+    // Check guest usage limit
+    if (!isAuthenticated && hasReachedGuestLimit()) {
+      setShowUsageLimitModal(true);
+      return;
+    }
     
     const userMessage = { role: 'user', content: prompt };
     setMessages(prev => [...prev, userMessage]);
@@ -316,6 +347,11 @@ const GenUIChatPage = () => {
         } catch (error) {
           console.error('Error saving assistant message:', error);
         }
+      }
+      
+      // Increment guest usage after successful generation
+      if (!isAuthenticated) {
+        incrementGuestUsage();
       }
       
     } catch (error) {
@@ -741,6 +777,15 @@ const GenUIChatPage = () => {
           </button>
         </form>
       </main>
+      
+      {/* Usage Limit Modal for guests */}
+      <UsageLimitModal
+        isOpen={showUsageLimitModal}
+        onClose={() => setShowUsageLimitModal(false)}
+        onSignInSuccess={() => {
+          setShowUsageLimitModal(false);
+        }}
+      />
     </div>
   );
 };

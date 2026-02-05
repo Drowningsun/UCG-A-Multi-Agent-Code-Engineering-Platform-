@@ -200,7 +200,15 @@
   display: flex;
   gap: 12px;
   justify-content: center;
-  margin-bottom: 60px;
+  margin-bottom: 24px;
+}
+
+.hero-guest-note {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: 36px;
+  opacity: 0.9;
 }
 
 .hero-stats {

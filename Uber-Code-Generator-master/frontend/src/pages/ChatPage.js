@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
+import UsageLimitModal from '../components/UsageLimitModal';
 import './ChatPage.css';
 
 const API_BASE = 'http://localhost:5000/api';
@@ -109,7 +110,7 @@ const escapeHtml = (text) => {
 const ChatPage = () => {
   const { sessionId: urlSessionId } = useParams();
   const navigate = useNavigate();
-  const { authAxios, token, user } = useAuth();
+  const { authAxios, token, user, isAuthenticated, hasReachedGuestLimit, incrementGuestUsage } = useAuth();
   const [sessionId, setSessionId] = useState(urlSessionId || null);
   const [sessionTitle, setSessionTitle] = useState('New Chat');
   const [prompt, setPrompt] = useState('');
@@ -127,6 +128,7 @@ const ChatPage = () => {
   const [showOriginal, setShowOriginal] = useState(false);
   const [agentFixes, setAgentFixes] = useState([]);
   const [originalCode, setOriginalCode] = useState('');
+  const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
   const messagesEndRef = useRef(null);
   const codeEndRef = useRef(null);
   const sessionCreatedRef = useRef(false);  // Prevent duplicate session creation
@@ -141,17 +143,22 @@ const ChatPage = () => {
 
   // Handle URL session ID changes
   useEffect(() => {
-    if (urlSessionId) {
-      // URL has a session ID - load it
+    if (urlSessionId && isAuthenticated) {
+      // URL has a session ID - load it (only if authenticated)
       setSessionId(urlSessionId);
       sessionCreatedRef.current = true;
     } else if (!sessionCreatedRef.current) {
-      // No URL session ID and no session created yet - create new
+      // No URL session ID and no session created yet
       sessionCreatedRef.current = true;
-      createSession();
+      if (isAuthenticated) {
+        createSession();
+      } else {
+        // Guest mode - just set up local state
+        setSessionTitle('Guest Session');
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlSessionId]);
+  }, [urlSessionId, isAuthenticated]);
 
   // Load session data when sessionId changes
   useEffect(() => {
@@ -188,6 +195,28 @@ const ChatPage = () => {
   };
 
   const createSession = async () => {
+    // Only create sessions for authenticated users
+    if (!isAuthenticated) {
+      // Guest mode - just reset local state
+      setSessionId(null);
+      setSessionTitle('Guest Session');
+      setMessages([]);
+      setPrompt('');
+      setResult(null);
+      setStreamingCode('');
+      setStreamingMessage('');
+      setIsStreaming(false);
+      setCurrentAgent(null);
+      setEditMode(false);
+      setEditedCode('');
+      setShowPromptEdit(false);
+      setAgentFixes([]);
+      setOriginalCode('');
+      sessionCreatedRef.current = true;
+      navigate('/chat');
+      return;
+    }
+    
     try {
       const response = await authAxios.post('/sessions');
       const newSessionId = response.data.session_id;
@@ -219,6 +248,12 @@ const ChatPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim() || loading) return;
+
+    // Check guest usage limit
+    if (!isAuthenticated && hasReachedGuestLimit()) {
+      setShowUsageLimitModal(true);
+      return;
+    }
 
     const userMessage = { role: 'user', content: prompt };
     setMessages(prev => [...prev, userMessage]);
@@ -358,6 +393,11 @@ const ChatPage = () => {
         } catch (error) {
           console.error('Error saving assistant message:', error);
         }
+      }
+      
+      // Increment guest usage after successful generation
+      if (!isAuthenticated) {
+        incrementGuestUsage();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -900,6 +940,15 @@ const ChatPage = () => {
           </button>
         </form>
       </main>
+      
+      {/* Usage Limit Modal for guests */}
+      <UsageLimitModal
+        isOpen={showUsageLimitModal}
+        onClose={() => setShowUsageLimitModal(false)}
+        onSignInSuccess={() => {
+          setShowUsageLimitModal(false);
+        }}
+      />
     </div>
   );
 };

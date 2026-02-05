@@ -16,16 +16,10 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/chat" element={
-              <ProtectedRoute>
-                <GenUIChatPageV2 />
-              </ProtectedRoute>
-            } />
-            <Route path="/chat/:sessionId" element={
-              <ProtectedRoute>
-                <GenUIChatPageV2 />
-              </ProtectedRoute>
-            } />
+            {/* Chat routes - accessible to guests with usage limit */}
+            <Route path="/chat" element={<GenUIChatPageV2 />} />
+            <Route path="/chat/:sessionId" element={<GenUIChatPageV2 />} />
+            {/* Dashboard requires authentication */}
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardPage />

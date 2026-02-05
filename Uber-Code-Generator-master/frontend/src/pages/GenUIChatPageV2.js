@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
+import UsageLimitModal from '../components/UsageLimitModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CodeBlock,
@@ -23,7 +24,10 @@ const API_BASE = 'http://localhost:5000/api';
 const GenUIChatPageV2 = () => {
   const { sessionId: urlSessionId } = useParams();
   const navigate = useNavigate();
-  const { authAxios, token } = useAuth();
+  const { authAxios, token, isAuthenticated, hasReachedGuestLimit, incrementGuestUsage } = useAuth();
+  
+  // Usage limit modal state
+  const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
   
   // Session state
   const [sessionId, setSessionId] = useState(urlSessionId || null);
@@ -105,15 +109,21 @@ const GenUIChatPageV2 = () => {
   
   // Handle URL session ID changes
   useEffect(() => {
-    if (urlSessionId) {
+    if (urlSessionId && isAuthenticated) {
+      // Only load session from URL if authenticated
       setSessionId(urlSessionId);
       sessionCreatedRef.current = true;
     } else if (!sessionCreatedRef.current) {
       sessionCreatedRef.current = true;
-      createSession();
+      if (isAuthenticated) {
+        createSession();
+      } else {
+        // Guest mode - just set up local state
+        setSessionTitle('Guest Session');
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlSessionId]);
+  }, [urlSessionId, isAuthenticated]);
   
   // Load session data
   useEffect(() => {
@@ -174,6 +184,21 @@ const GenUIChatPageV2 = () => {
   };
   
   const createSession = async () => {
+    // Only create sessions for authenticated users
+    if (!isAuthenticated) {
+      // Guest mode - just reset local state
+      setSessionId(null);
+      setSessionTitle('Guest Session');
+      setMessages([]);
+      setPrompt('');
+      setResult(null);
+      setStreamingCode('');
+      resetAGUI();
+      sessionCreatedRef.current = true;
+      navigate('/chat');
+      return;
+    }
+    
     try {
       const response = await authAxios.post('/sessions');
       const newSessionId = response.data.session_id;
@@ -195,6 +220,12 @@ const GenUIChatPageV2 = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim() || loading) return;
+    
+    // Check guest usage limit
+    if (!isAuthenticated && hasReachedGuestLimit()) {
+      setShowUsageLimitModal(true);
+      return;
+    }
     
     const userMessage = { role: 'user', content: prompt };
     setMessages(prev => [...prev, userMessage]);
@@ -442,6 +473,11 @@ const GenUIChatPageV2 = () => {
         } catch (error) {
           console.error('Error saving assistant message:', error);
         }
+      }
+      
+      // Increment guest usage after successful generation
+      if (!isAuthenticated) {
+        incrementGuestUsage();
       }
       
     } catch (error) {
@@ -1201,6 +1237,16 @@ const GenUIChatPageV2 = () => {
           </>
         )}
       </AnimatePresence>
+      
+      {/* Usage Limit Modal for guests */}
+      <UsageLimitModal
+        isOpen={showUsageLimitModal}
+        onClose={() => setShowUsageLimitModal(false)}
+        onSignInSuccess={() => {
+          setShowUsageLimitModal(false);
+          // User is now authenticated, they can continue
+        }}
+      />
     </div>
   );
 };

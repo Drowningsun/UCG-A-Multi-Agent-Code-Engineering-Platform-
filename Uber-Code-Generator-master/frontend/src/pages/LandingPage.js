@@ -83,10 +83,21 @@ const LandingPage = () => {
               Start Generating
               <span className="btn-arrow">→</span>
             </Link>
-            <Link to="/dashboard" className="btn btn-large btn-outline">
-              View Dashboard
-            </Link>
+            {isAuthenticated ? (
+              <Link to="/dashboard" className="btn btn-large btn-outline">
+                View Dashboard
+              </Link>
+            ) : (
+              <Link to="/login" className="btn btn-large btn-outline">
+                Sign In for Unlimited
+              </Link>
+            )}
           </div>
+          {!isAuthenticated && (
+            <p className="hero-guest-note">
+              ✨ Try 1 free generation as a guest — no sign-in required!
+            </p>
+          )}
           <div className="hero-stats">
             <div className="stat">
               <span className="stat-value">4</span>

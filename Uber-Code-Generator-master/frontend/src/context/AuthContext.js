@@ -3,6 +3,10 @@ import axios from 'axios';
 
 const API_BASE = 'http://localhost:5000/api';
 
+// Guest usage limit
+const GUEST_USAGE_LIMIT = 1;
+const GUEST_USAGE_KEY = 'guest_prompts_used';
+
 // Create Auth Context
 const AuthContext = createContext(null);
 
@@ -11,6 +15,30 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('auth_token'));
   const [loading, setLoading] = useState(true);
+  const [guestUsage, setGuestUsage] = useState(() => {
+    return parseInt(localStorage.getItem(GUEST_USAGE_KEY) || '0', 10);
+  });
+
+  // Guest usage tracking functions
+  const getGuestUsageCount = () => {
+    return parseInt(localStorage.getItem(GUEST_USAGE_KEY) || '0', 10);
+  };
+
+  const incrementGuestUsage = () => {
+    const newCount = getGuestUsageCount() + 1;
+    localStorage.setItem(GUEST_USAGE_KEY, newCount.toString());
+    setGuestUsage(newCount);
+    return newCount;
+  };
+
+  const hasReachedGuestLimit = () => {
+    return getGuestUsageCount() >= GUEST_USAGE_LIMIT;
+  };
+
+  const resetGuestUsage = () => {
+    localStorage.removeItem(GUEST_USAGE_KEY);
+    setGuestUsage(0);
+  };
 
   // Check if user is logged in on mount
   useEffect(() => {
@@ -49,6 +77,9 @@ export const AuthProvider = ({ children }) => {
       setToken(access_token);
       setUser(userData);
       
+      // Reset guest usage on successful login
+      resetGuestUsage();
+      
       return { success: true, user: userData };
     } catch (error) {
       console.error('Google sign-in error:', error);
@@ -85,7 +116,13 @@ export const AuthProvider = ({ children }) => {
     signInWithGoogle,
     logout,
     getAuthHeader,
-    authAxios
+    authAxios,
+    // Guest usage tracking
+    guestUsage,
+    getGuestUsageCount,
+    incrementGuestUsage,
+    hasReachedGuestLimit,
+    resetGuestUsage
   };
 
   return (
