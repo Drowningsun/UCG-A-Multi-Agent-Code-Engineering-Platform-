@@ -44,15 +44,18 @@ Respond in this EXACT JSON format (no markdown, just valid JSON):
             "line": 5
         }
     ],
-    "fixed_code": "THE COMPLETE FIXED CODE WITH ALL ERROR HANDLING ADDED",
+    "fixed_code": "<PASTE THE ENTIRE CODE HERE WITH ALL ERROR HANDLING ADDED - DO NOT USE PLACEHOLDER TEXT>",
     "suggested_tests": ["Test with valid input", "Test with None", "Test exception handling"]
 }
 
 CRITICAL RULES:
+- fixed_code MUST contain the ACTUAL complete source code with fixes applied, NOT placeholder text
+- NEVER return placeholder strings like 'THE COMPLETE FIXED CODE' - return real code
 1. fixes_applied must be an array of objects with description, before, after, and line
 2. Escape all quotes and newlines properly (use \\n for newlines)
-3. fixed_code must contain the COMPLETE fixed code
+3. fixed_code must contain the COMPLETE ACTUAL fixed code - copy the entire input code and apply your fixes to it
 4. Do NOT include markdown or code blocks - just pure JSON
+5. IMPORTANT: The fixed_code field must be the REAL source code, not description text
 
 Focus on adding:
 - try/except blocks for risky operations

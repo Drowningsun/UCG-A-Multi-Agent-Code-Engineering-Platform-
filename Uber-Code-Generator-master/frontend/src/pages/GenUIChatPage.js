@@ -49,10 +49,6 @@ const GenUIChatPage = () => {
   const [editPrompt, setEditPrompt] = useState('');
   const [showPromptEdit, setShowPromptEdit] = useState(false);
   
-  // API key state
-  const [apiKey, setApiKey] = useState(localStorage.getItem('groq_api_key') || '');
-  const [showSettings, setShowSettings] = useState(false);
-  
   // Streaming & result state
   const [loading, setLoading] = useState(false);
   const [streamingCode, setStreamingCode] = useState('');
@@ -150,11 +146,6 @@ const GenUIChatPage = () => {
     }
   };
   
-  const saveApiKey = () => {
-    localStorage.setItem('groq_api_key', apiKey);
-    setShowSettings(false);
-  };
-  
   // Main submit handler with AG-UI streaming
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -191,7 +182,7 @@ const GenUIChatPage = () => {
       const response = await fetch(`${API_BASE}/generate/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, api_key: apiKey })
+        body: JSON.stringify({ prompt })
       });
       
       const reader = response.body.getReader();
@@ -603,24 +594,7 @@ const GenUIChatPage = () => {
           <Link to="/dashboard" className="nav-item">
             <span>📊</span> Dashboard
           </Link>
-          <button className="nav-item" onClick={() => setShowSettings(!showSettings)}>
-            <span>⚙️</span> Settings
-          </button>
         </nav>
-        
-        {showSettings && (
-          <div className="settings-panel">
-            <h4>Groq API Key</h4>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="gsk_..."
-            />
-            <button className="btn btn-primary btn-sm" onClick={saveApiKey}>Save</button>
-            <p className="hint">Get free key from console.groq.com</p>
-          </div>
-        )}
         
         <div className="sidebar-footer">
           <div className="session-info">
@@ -684,15 +658,6 @@ const GenUIChatPage = () => {
               </button>
             </div>
           </motion.div>
-        )}
-        
-        {/* API Key Warning */}
-        {(!apiKey || apiKey.length < 10) && (
-          <Alert
-            severity="warning"
-            title="No API Key Configured"
-            message="Agents will run in basic mode. Add your Groq API key in Settings for full AI-powered auto-fixing."
-          />
         )}
         
         {/* Messages Area */}

@@ -33,10 +33,6 @@ const GenUIChatPageV2 = () => {
   // Input state
   const [prompt, setPrompt] = useState('');
   
-  // API key state
-  const [apiKey, setApiKey] = useState(localStorage.getItem('groq_api_key') || '');
-  const [showSettings, setShowSettings] = useState(false);
-  
   // Streaming & result state
   const [loading, setLoading] = useState(false);
   const [streamingCode, setStreamingCode] = useState('');
@@ -195,11 +191,6 @@ const GenUIChatPageV2 = () => {
     }
   };
   
-  const saveApiKey = () => {
-    localStorage.setItem('groq_api_key', apiKey);
-    setShowSettings(false);
-  };
-  
   // Main submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -236,7 +227,6 @@ const GenUIChatPageV2 = () => {
       // Include context_code if we have previously generated code
       const requestBody = { 
         prompt, 
-        api_key: apiKey,
         context_code: result?.code || null  // Send previous code for follow-up prompts
       };
       
@@ -727,27 +717,7 @@ const GenUIChatPageV2 = () => {
             <span>📊</span>
             <span>History</span>
           </Link>
-          <button 
-            className={`action-btn ${showSettings ? 'active' : ''}`}
-            onClick={() => setShowSettings(!showSettings)}
-          >
-            <span>⚙️</span>
-            <span>Settings</span>
-          </button>
         </nav>
-        
-        {showSettings && (
-          <div className="settings-dropdown">
-            <label>Groq API Key</label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="gsk_..."
-            />
-            <button onClick={saveApiKey}>Save</button>
-          </div>
-        )}
         
         <div className="sidebar-footer">
           <UserMenu />

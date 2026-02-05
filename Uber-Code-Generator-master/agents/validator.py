@@ -48,14 +48,17 @@ Respond in this EXACT JSON format (no markdown, just valid JSON):
             "line": 25
         }
     ],
-    "fixed_code": "THE COMPLETE FIXED CODE HERE"
+    "fixed_code": "<PASTE THE ENTIRE CODE HERE WITH ALL FIXES APPLIED - DO NOT USE PLACEHOLDER TEXT>"
 }
 
 CRITICAL RULES:
+- fixed_code MUST contain the ACTUAL complete source code with fixes applied, NOT placeholder text
+- NEVER return placeholder strings like 'THE COMPLETE FIXED CODE HERE' - return real code
 1. fixes_applied must be an array of objects with description, before, after, and line
 2. Escape all quotes and newlines properly in strings
-3. fixed_code must contain the COMPLETE fixed code
-4. Do NOT include markdown or code blocks - just pure JSON"""
+3. fixed_code must contain the COMPLETE ACTUAL fixed code - copy the entire input code and apply your fixes to it
+4. Do NOT include markdown or code blocks - just pure JSON
+5. IMPORTANT: The fixed_code field must be the REAL source code, not description text"""
     
     def validate(self, code):
         """Validate code and return analysis with potential fixes"""

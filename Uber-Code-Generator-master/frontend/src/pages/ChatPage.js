@@ -125,8 +125,6 @@ const ChatPage = () => {
   const [editedCode, setEditedCode] = useState('');
   const [showPromptEdit, setShowPromptEdit] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('groq_api_key') || '');
-  const [showSettings, setShowSettings] = useState(false);
   const [agentFixes, setAgentFixes] = useState([]);
   const [originalCode, setOriginalCode] = useState('');
   const messagesEndRef = useRef(null);
@@ -218,11 +216,6 @@ const ChatPage = () => {
     }
   };
 
-  const saveApiKey = () => {
-    localStorage.setItem('groq_api_key', apiKey);
-    setShowSettings(false);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim() || loading) return;
@@ -260,7 +253,7 @@ const ChatPage = () => {
       const response = await fetch(`${API_BASE}/generate/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, api_key: apiKey })
+        body: JSON.stringify({ prompt })
       });
 
       const reader = response.body.getReader();
@@ -394,8 +387,7 @@ const ChatPage = () => {
         body: JSON.stringify({
           original_prompt: result.prompt || prompt,
           edit_instructions: editPrompt,
-          current_code: result.code,
-          api_key: apiKey
+          current_code: result.code
         })
       });
 
@@ -515,27 +507,7 @@ const ChatPage = () => {
           <Link to="/dashboard" className="nav-item">
             <span>📊</span> Dashboard
           </Link>
-          <button className="nav-item" onClick={() => setShowSettings(!showSettings)}>
-            <span>⚙️</span> Settings
-          </button>
         </nav>
-        
-        {showSettings && (
-          <div className="settings-panel">
-            <h4>Groq API Key</h4>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="gsk_..."
-            />
-            <button className="btn btn-primary btn-sm" onClick={saveApiKey}>Save</button>
-            <p className="hint">Get free key from console.groq.com</p>
-            {(!apiKey || apiKey.length < 10) && (
-              <p className="warning-text">⚠️ No API key = Basic mode only (no AI fixes)</p>
-            )}
-          </div>
-        )}
         
         <div className="sidebar-footer">
           <div className="session-info">
@@ -604,18 +576,6 @@ const ChatPage = () => {
           </div>
         )}
 
-        {/* API Key Warning Banner */}
-        {(!apiKey || apiKey.length < 10) && (
-          <div className="api-warning-banner">
-            <span>⚠️</span>
-            <div>
-              <strong>No API Key Configured</strong>
-              <p>Agents will run in basic mode (detection only, no AI fixes). Add your Groq API key in Settings for full AI-powered auto-fixing.</p>
-            </div>
-            <button className="btn btn-sm btn-primary" onClick={() => setShowSettings(true)}>Add Key</button>
-          </div>
-        )}
-
         {/* Messages Area */}
         <div className="chat-messages">
           {messages.length === 0 && !loading && (
@@ -623,12 +583,6 @@ const ChatPage = () => {
               <div className="welcome-icon">🤖</div>
               <h2>Uber Code Generator</h2>
               <p>Powered by Llama 3.3 via Groq (Ultra Fast!)</p>
-              {(!apiKey || apiKey.length < 10) && (
-                <div className="api-key-prompt">
-                  <p>🔑 <strong>First:</strong> Add your Groq API key for AI-powered agents</p>
-                  <button className="btn btn-primary" onClick={() => setShowSettings(true)}>⚙️ Open Settings</button>
-                </div>
-              )}
               <div className="example-prompts">
                 <h4>Try these:</h4>
                 <button onClick={() => setPrompt('Create a Python function to calculate fibonacci numbers with memoization')}>
