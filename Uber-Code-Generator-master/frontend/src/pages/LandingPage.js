@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
+import LiquidChrome from '../components/LiquidChrome';
 import './LandingPage.css';
 
 const LandingPage = () => {
@@ -113,7 +114,18 @@ const LandingPage = () => {
             </div>
           </div>
         </div>
-        <div className="hero-glow"></div>
+        
+        {/* Liquid Chrome Background */}
+        <div className="hero-liquid-chrome">
+          <LiquidChrome
+            baseColor={[0.1, 0.05, 0.0]}
+            speed={0.8}
+            amplitude={0.5}
+            frequencyX={2.5}
+            frequencyY={2.5}
+            interactive={true}
+          />
+        </div>
       </section>
 
       {/* Features Section */}
