@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
-import LiquidChrome from '../components/LiquidChrome';
+import Ballpit from '../components/Ballpit';
 import './LandingPage.css';
 
 const LandingPage = () => {
@@ -41,6 +41,26 @@ const LandingPage = () => {
 
   return (
     <div className="landing-page">
+      {/* Fixed Ballpit Background */}
+      <div className="hero-liquid-chrome">
+        <Ballpit
+          count={100}
+          gravity={0.01}
+          friction={0.9975}
+          wallBounce={0.95}
+          followCursor={false}
+          colors={[0x3333ff, 0x5555ff, 0x8844ff, 0xcccccc, 0xffffff]}
+          lightIntensity={300}
+          ambientIntensity={1.5}
+          materialParams={{
+            metalness: 0.6,
+            roughness: 0.3,
+            clearcoat: 1,
+            clearcoatRoughness: 0.1
+          }}
+        />
+      </div>
+      
       {/* Header */}
       <header className="header">
         <div className="container header-content">
@@ -113,18 +133,6 @@ const LandingPage = () => {
               <span className="stat-label">Protocol</span>
             </div>
           </div>
-        </div>
-        
-        {/* Liquid Chrome Background */}
-        <div className="hero-liquid-chrome">
-          <LiquidChrome
-            baseColor={[0.1, 0.05, 0.0]}
-            speed={0.8}
-            amplitude={0.5}
-            frequencyX={2.5}
-            frequencyY={2.5}
-            interactive={true}
-          />
         </div>
       </section>
 

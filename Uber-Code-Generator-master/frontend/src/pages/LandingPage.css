@@ -3,18 +3,21 @@
   background: var(--dark);
 }
 
-/* Header - Grok Style */
+/* Header - Floating Pill Style */
 .header {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 48px);
+  max-width: 1200px;
   z-index: 1000;
-  padding: 12px 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border-color);
+  padding: 12px 24px;
+  background: rgba(15, 15, 20, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50px;
 }
 
 .header-content {
@@ -211,6 +214,55 @@
   margin-bottom: 24px;
 }
 
+/* Liquid Glass Hero Buttons */
+.hero-buttons .btn {
+  border-radius: 50px;
+  padding: 14px 28px;
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-buttons .btn-gradient {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: var(--white) !important;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.hero-buttons .btn-gradient:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 30px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.hero-buttons .btn-outline {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: var(--white) !important;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.hero-buttons .btn-outline:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 30px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
 .hero-guest-note {
   text-align: center;
   color: var(--text-secondary);
@@ -255,13 +307,13 @@
 
 /* Liquid Chrome Background */
 .hero-liquid-chrome {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: 0;
-  opacity: 0.6;
+  opacity: 1;
   pointer-events: auto;
 }
 
@@ -283,6 +335,8 @@
 
 /* Features - Grok Style */
 .features {
+  position: relative;
+  z-index: 1;
   padding: 80px 0;
   background: var(--dark);
   border-top: 1px solid var(--border-color);
@@ -343,6 +397,8 @@
 
 /* Workflow - Arrow Flow Style */
 .workflow {
+  position: relative;
+  z-index: 1;
   padding: 80px 0;
   background: var(--dark-light);
   border-top: 1px solid var(--border-color);
@@ -438,6 +494,8 @@
 
 /* CTA - Grok Style */
 .cta {
+  position: relative;
+  z-index: 1;
   padding: 80px 0;
   background: var(--dark-card);
   text-align: center;
@@ -458,6 +516,8 @@
 
 /* About Section - Grok Style */
 .about {
+  position: relative;
+  z-index: 1;
   padding: 80px 0;
   background: var(--dark);
   border-top: 1px solid var(--border-color);
@@ -550,6 +610,8 @@
 
 /* Footer - Grok Style */
 .footer {
+  position: relative;
+  z-index: 1;
   padding: 32px 0;
   background: var(--dark);
   border-top: 1px solid var(--border-color);
