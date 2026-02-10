@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
 import ConfirmModal from '../components/ConfirmModal';
+import ScrollReveal, { StaggerContainer, StaggerItem } from '../components/ScrollReveal';
+import AnimatedCounter from '../components/AnimatedCounter';
+import ParticleNetwork from '../components/ParticleNetwork';
+import SpotlightCard from '../components/SpotlightCard';
 import './DashboardPage.css';
 
 const DashboardPage = () => {
@@ -11,16 +15,16 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedSessions, setSelectedSessions] = useState(new Set());
-  
+
   // Confirm modal state
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: 'danger'
   });
-  
+
   const closeConfirmModal = () => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
   };
@@ -71,7 +75,7 @@ const DashboardPage = () => {
 
   const deleteSelectedSessions = () => {
     if (selectedSessions.size === 0) return;
-    
+
     setConfirmModal({
       isOpen: true,
       title: 'Delete Selected Sessions',
@@ -100,11 +104,11 @@ const DashboardPage = () => {
         title: 'No Empty Sessions',
         message: 'There are no empty sessions to clean up.',
         variant: 'info',
-        onConfirm: () => {}
+        onConfirm: () => { }
       });
       return;
     }
-    
+
     setConfirmModal({
       isOpen: true,
       title: 'Clean Up Empty Sessions',
@@ -124,7 +128,7 @@ const DashboardPage = () => {
   const deleteSession = (sessionId, e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const session = sessions.find(s => s.session_id === sessionId);
     setConfirmModal({
       isOpen: true,
@@ -146,7 +150,7 @@ const DashboardPage = () => {
     const date = new Date(dateString);
     const now = new Date();
     const diff = now - date;
-    
+
     // Less than 24 hours
     if (diff < 86400000) {
       const hours = Math.floor(diff / 3600000);
@@ -156,13 +160,13 @@ const DashboardPage = () => {
       }
       return `${hours}h ago`;
     }
-    
+
     // Less than 7 days
     if (diff < 604800000) {
       const days = Math.floor(diff / 86400000);
       return days === 1 ? 'Yesterday' : `${days} days ago`;
     }
-    
+
     return date.toLocaleDateString();
   };
 
@@ -175,6 +179,7 @@ const DashboardPage = () => {
 
   return (
     <div className="dashboard-page">
+      <ParticleNetwork />
       {/* Header */}
       <header className="dashboard-header">
         <div className="container header-content">
@@ -193,93 +198,111 @@ const DashboardPage = () => {
         <div className="container">
           {/* Stats Section */}
           <section className="stats-section">
-            <h1>Dashboard</h1>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-icon">📊</div>
-                <div className="stat-info">
-                  <span className="stat-value">{sessions.length}</span>
-                  <span className="stat-label">Total Sessions</span>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">💬</div>
-                <div className="stat-info">
-                  <span className="stat-value">{sessions.filter(s => s.message_count > 0).length}</span>
-                  <span className="stat-label">Active Chats</span>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">✨</div>
-                <div className="stat-info">
-                  <span className="stat-value">{sessions.reduce((acc, s) => acc + (s.message_count || 0), 0)}</span>
-                  <span className="stat-label">Total Messages</span>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">🤖</div>
-                <div className="stat-info">
-                  <span className="stat-value">4</span>
-                  <span className="stat-label">Active Agents</span>
-                </div>
-              </div>
-            </div>
+            <ScrollReveal direction="fadeUp">
+              <h1>Dashboard</h1>
+            </ScrollReveal>
+            <StaggerContainer staggerDelay={0.1} className="stats-grid">
+              <StaggerItem direction="fadeUp">
+                <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
+                  <div className="stat-icon">📊</div>
+                  <div className="stat-info">
+                    <span className="stat-value"><AnimatedCounter target={sessions.length} duration={800} /></span>
+                    <span className="stat-label">Total Sessions</span>
+                  </div>
+                </SpotlightCard>
+              </StaggerItem>
+              <StaggerItem direction="fadeUp">
+                <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
+                  <div className="stat-icon">💬</div>
+                  <div className="stat-info">
+                    <span className="stat-value"><AnimatedCounter target={sessions.filter(s => s.message_count > 0).length} duration={800} /></span>
+                    <span className="stat-label">Active Chats</span>
+                  </div>
+                </SpotlightCard>
+              </StaggerItem>
+              <StaggerItem direction="fadeUp">
+                <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
+                  <div className="stat-icon">✨</div>
+                  <div className="stat-info">
+                    <span className="stat-value"><AnimatedCounter target={sessions.reduce((acc, s) => acc + (s.message_count || 0), 0)} duration={1200} /></span>
+                    <span className="stat-label">Total Messages</span>
+                  </div>
+                </SpotlightCard>
+              </StaggerItem>
+              <StaggerItem direction="fadeUp">
+                <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
+                  <div className="stat-icon">🤖</div>
+                  <div className="stat-info">
+                    <span className="stat-value"><AnimatedCounter target={4} duration={600} /></span>
+                    <span className="stat-label">Active Agents</span>
+                  </div>
+                </SpotlightCard>
+              </StaggerItem>
+            </StaggerContainer>
           </section>
 
           {/* Agents Section */}
           <section className="agents-section">
-            <h2>Agent Status</h2>
-            <div className="agents-grid">
+            <ScrollReveal direction="fadeUp">
+              <h2>Agent Status</h2>
+            </ScrollReveal>
+            <StaggerContainer staggerDelay={0.12} className="agents-grid">
               {agents.map((agent, index) => (
-                <div key={index} className="agent-card">
-                  <div className="agent-icon">{agent.icon}</div>
-                  <div className="agent-info">
-                    <h3>{agent.name}</h3>
-                    <p>{agent.description}</p>
-                  </div>
-                  <div className={`agent-status ${agent.status}`}>
-                    <span className="status-dot"></span>
-                    {agent.status}
-                  </div>
-                </div>
+                <StaggerItem key={index} direction="fadeUp">
+                  <SpotlightCard className="agent-card" spotlightColor="rgba(249, 115, 22, 0.1)">
+                    <div className="agent-icon">{agent.icon}</div>
+                    <div className="agent-info">
+                      <h3>{agent.name}</h3>
+                      <p>{agent.description}</p>
+                    </div>
+                    <div className={`agent-status ${agent.status}`}>
+                      <span className="status-dot"></span>
+                      {agent.status}
+                    </div>
+                  </SpotlightCard>
+                </StaggerItem>
               ))}
-            </div>
+            </StaggerContainer>
           </section>
 
           {/* Workflow Diagram */}
           <section className="workflow-section">
-            <h2>Agent Orchestration Flow</h2>
-            <div className="workflow-diagram">
-              <div className="workflow-node start">
-                <span>📝</span>
-                <label>User Prompt</label>
+            <ScrollReveal direction="fadeUp">
+              <h2>Agent Orchestration Flow</h2>
+            </ScrollReveal>
+            <ScrollReveal direction="scaleIn" delay={0.2}>
+              <div className="workflow-diagram">
+                <div className="workflow-node start">
+                  <span>📝</span>
+                  <label>User Prompt</label>
+                </div>
+                <div className="workflow-arrow">→</div>
+                <div className="workflow-node">
+                  <span>⚡</span>
+                  <label>Code Gen</label>
+                </div>
+                <div className="workflow-arrow">→</div>
+                <div className="workflow-node">
+                  <span>✓</span>
+                  <label>Validate</label>
+                </div>
+                <div className="workflow-arrow">→</div>
+                <div className="workflow-node">
+                  <span>🧪</span>
+                  <label>Test</label>
+                </div>
+                <div className="workflow-arrow">→</div>
+                <div className="workflow-node">
+                  <span>🛡️</span>
+                  <label>Secure</label>
+                </div>
+                <div className="workflow-arrow">→</div>
+                <div className="workflow-node end">
+                  <span>✅</span>
+                  <label>Output</label>
+                </div>
               </div>
-              <div className="workflow-arrow">→</div>
-              <div className="workflow-node">
-                <span>⚡</span>
-                <label>Code Gen</label>
-              </div>
-              <div className="workflow-arrow">→</div>
-              <div className="workflow-node">
-                <span>✓</span>
-                <label>Validate</label>
-              </div>
-              <div className="workflow-arrow">→</div>
-              <div className="workflow-node">
-                <span>🧪</span>
-                <label>Test</label>
-              </div>
-              <div className="workflow-arrow">→</div>
-              <div className="workflow-node">
-                <span>🛡️</span>
-                <label>Secure</label>
-              </div>
-              <div className="workflow-arrow">→</div>
-              <div className="workflow-node end">
-                <span>✅</span>
-                <label>Output</label>
-              </div>
-            </div>
+            </ScrollReveal>
           </section>
 
           {/* Sessions Section */}
@@ -293,8 +316,8 @@ const DashboardPage = () => {
                       <button className="btn btn-sm btn-secondary" onClick={selectAll}>
                         {selectedSessions.size === sessions.length ? 'Deselect All' : 'Select All'}
                       </button>
-                      <button 
-                        className="btn btn-sm btn-danger" 
+                      <button
+                        className="btn btn-sm btn-danger"
                         onClick={deleteSelectedSessions}
                         disabled={selectedSessions.size === 0}
                       >
@@ -332,15 +355,15 @@ const DashboardPage = () => {
             ) : (
               <div className="sessions-list">
                 {sessions.map((session) => (
-                  <div 
-                    key={session.session_id} 
+                  <div
+                    key={session.session_id}
                     className={`session-card ${selectMode ? 'select-mode' : ''} ${selectedSessions.has(session.session_id) ? 'selected' : ''} ${session.message_count === 0 ? 'empty-session' : ''}`}
                     onClick={selectMode ? (e) => toggleSessionSelection(session.session_id, e) : undefined}
                   >
                     {selectMode && (
                       <div className="session-checkbox">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={selectedSessions.has(session.session_id)}
                           onChange={(e) => toggleSessionSelection(session.session_id, e)}
                         />
@@ -359,7 +382,7 @@ const DashboardPage = () => {
                           <span className={`message-count ${session.message_count === 0 ? 'empty' : ''}`}>
                             {session.message_count === 0 ? 'Empty' : `${session.message_count} messages`}
                           </span>
-                          <button 
+                          <button
                             className="delete-session-btn"
                             onClick={(e) => deleteSession(session.session_id, e)}
                             title="Delete session"
@@ -391,7 +414,7 @@ const DashboardPage = () => {
           </section>
         </div>
       </main>
-      
+
       {/* Confirm Modal */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}

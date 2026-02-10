@@ -1,6 +1,15 @@
 .dashboard-page {
+  position: relative;
   min-height: 100vh;
   background: var(--dark);
+  isolation: isolate;
+  overflow-x: hidden;
+}
+
+.dashboard-header,
+.dashboard-main {
+  position: relative;
+  z-index: 1;
 }
 
 /* Dashboard Header - Grok Style */
@@ -442,8 +451,15 @@
 
 /* Animations */
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Responsive */
@@ -451,16 +467,84 @@
   .workflow-diagram {
     flex-wrap: wrap;
   }
-  
+
   .workflow-arrow {
     display: none;
   }
-  
+
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .agents-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ===== MICRO-INTERACTIONS ===== */
+
+/* Stat card glow border on hover */
+.stat-card:hover {
+  border-color: rgba(249, 115, 22, 0.4);
+  box-shadow: 0 4px 25px rgba(249, 115, 22, 0.08);
+}
+
+/* Agent card icon bounce on hover */
+.agent-card:hover .agent-icon {
+  animation: agentIconBounce 0.4s ease;
+}
+
+@keyframes agentIconBounce {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+/* Delete button danger shake */
+.delete-session-btn:active {
+  animation: deleteShake 0.3s ease;
+}
+
+@keyframes deleteShake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-3px);
+  }
+
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+/* Session card staggered enter */
+.session-card {
+  animation: sessionSlideIn 0.3s ease;
+}
+
+@keyframes sessionSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Workflow node glow pulse */
+.workflow-node:hover {
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.15);
 }
