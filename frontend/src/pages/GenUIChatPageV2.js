@@ -63,6 +63,9 @@ const GenUIChatPageV2 = () => {
   const [activeAgent, setActiveAgent] = useState(null);
   const [agentMessages, setAgentMessages] = useState([]);
   
+  // Completion celebration
+  const [showCompletion, setShowCompletion] = useState(false);
+  
   // Refs
   const messagesEndRef = useRef(null);
   const sessionCreatedRef = useRef(false);
@@ -489,6 +492,9 @@ const GenUIChatPageV2 = () => {
     } finally {
       setLoading(false);
       setPrompt('');
+      // Trigger completion celebration
+      setShowCompletion(true);
+      setTimeout(() => setShowCompletion(false), 3000);
     }
   };
   
@@ -796,10 +802,15 @@ const GenUIChatPageV2 = () => {
                   m.agent?.toLowerCase().includes(agents[i].split('_')[0]) && m.type === 'result'
                 );
                 return (
-                  <div key={step} className={`workflow-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
-                    <span className="step-icon">{['⚡', '✓', '🧪', '🛡️'][i]}</span>
-                    <span className="step-name">{step}</span>
-                  </div>
+                  <React.Fragment key={step}>
+                    <div className={`workflow-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
+                      <span className="step-icon">{isDone ? '✓' : ['⚡', '✓', '🧪', '🛡️'][i]}</span>
+                      <span className="step-name">{step}</span>
+                    </div>
+                    {i < 3 && (
+                      <div className={`workflow-connector ${isDone ? 'filled' : ''} ${isActive ? 'active' : ''}`} />
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -1056,19 +1067,29 @@ const GenUIChatPageV2 = () => {
                     </div>
                   </div>
                   
-                  <div className="code-view">
+                  <div className={`code-view ${loading ? 'streaming' : ''} ${showCompletion ? 'completion-flash' : ''}`}>
                     <CodeBlock
                       code={showOriginal ? result?.original_code : (result?.code || streamingCode)}
                       language="python"
                       lineNumbers={true}
                       maxHeight="calc(100vh - 250px)"
                     />
+                    {loading && <span className="streaming-cursor" />}
                   </div>
                   
                   {loading && (
                     <div className="streaming-bar">
                       <span className="pulse">●</span>
                       <span>Streaming... {streamingStats.lines} lines</span>
+                    </div>
+                  )}
+                  
+                  {showCompletion && (
+                    <div className="completion-badge">
+                      <svg className="checkmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                      Generation Complete
                     </div>
                   )}
                 </div>
