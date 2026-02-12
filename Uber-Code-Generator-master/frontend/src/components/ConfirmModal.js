@@ -1,11 +1,12 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './ConfirmModal.css';
 
-const ConfirmModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
+const ConfirmModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
   title = 'Confirm Action',
   message = 'Are you sure you want to proceed?',
   confirmText = 'Confirm',
@@ -32,16 +33,16 @@ const ConfirmModal = ({
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <motion.div 
+      <motion.div
         className="confirm-modal-overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       >
-        <motion.div 
+        <motion.div
           className={`confirm-modal ${variant}`}
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -55,13 +56,13 @@ const ConfirmModal = ({
           <h3 className="confirm-modal-title">{title}</h3>
           <p className="confirm-modal-message">{message}</p>
           <div className="confirm-modal-actions">
-            <button 
+            <button
               className="confirm-modal-btn cancel"
               onClick={onClose}
             >
               {cancelText}
             </button>
-            <button 
+            <button
               className={`confirm-modal-btn confirm ${variant}`}
               onClick={handleConfirm}
             >
@@ -70,7 +71,8 @@ const ConfirmModal = ({
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

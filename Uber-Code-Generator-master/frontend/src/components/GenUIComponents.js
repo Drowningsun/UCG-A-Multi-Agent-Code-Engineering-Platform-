@@ -3,6 +3,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './GenUIComponents.css';
 
 // ==================== ANIMATION VARIANTS ====================
@@ -35,9 +37,9 @@ export const SeverityBadge = ({ severity, showIcon = true }) => {
     low: { icon: '🟢', label: 'Low', className: 'severity-low' },
     info: { icon: '🔵', label: 'Info', className: 'severity-info' }
   };
-  
+
   const { icon, label, className } = config[severity?.toLowerCase()] || config.info;
-  
+
   return (
     <span className={`genui-severity-badge ${className}`}>
       {showIcon && <span className="severity-icon">{icon}</span>}
@@ -53,11 +55,11 @@ export const StatusIndicator = ({ status, pulse = false }) => {
     complete: { color: '#10b981', icon: '✓' },
     error: { color: '#ef4444', icon: '✕' }
   };
-  
+
   const { color, icon } = statusConfig[status] || statusConfig.pending;
-  
+
   return (
-    <span 
+    <span
       className={`genui-status-indicator ${status} ${pulse ? 'pulse' : ''}`}
       style={{ color }}
     >
@@ -68,11 +70,11 @@ export const StatusIndicator = ({ status, pulse = false }) => {
 
 // ==================== LAYOUT COMPONENTS ====================
 
-export const Card = ({ 
-  title, 
-  subtitle, 
-  children, 
-  footer, 
+export const Card = ({
+  title,
+  subtitle,
+  children,
+  footer,
   variant = 'default',
   collapsible = false,
   defaultExpanded = true,
@@ -81,9 +83,9 @@ export const Card = ({
   className = ''
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  
+
   return (
-    <motion.div 
+    <motion.div
       className={`genui-card ${variant} ${className}`}
       variants={slideIn}
       initial="initial"
@@ -111,7 +113,7 @@ export const Card = ({
       )}
       <AnimatePresence>
         {expanded && (
-          <motion.div 
+          <motion.div
             className="genui-card-content"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -127,12 +129,12 @@ export const Card = ({
 };
 
 export const Grid = ({ children, columns = 2, gap = '16px', className = '' }) => (
-  <div 
+  <div
     className={`genui-grid ${className}`}
-    style={{ 
+    style={{
       display: 'grid',
       gridTemplateColumns: `repeat(${columns}, 1fr)`,
-      gap 
+      gap
     }}
   >
     {children}
@@ -149,9 +151,9 @@ export const Divider = ({ text }) => (
 
 export const StatCard = ({ label, value, icon, change, variant = 'default', trend }) => {
   const trendClass = trend === 'up' ? 'trend-up' : trend === 'down' ? 'trend-down' : '';
-  
+
   return (
-    <motion.div 
+    <motion.div
       className={`genui-stat-card ${variant}`}
       variants={scaleIn}
       initial="initial"
@@ -174,12 +176,12 @@ export const StatCard = ({ label, value, icon, change, variant = 'default', tren
 
 export const ProgressBar = ({ value, max = 100, label, variant = 'primary', showValue = true, animated = true }) => {
   const percentage = Math.min(100, Math.max(0, (value / max) * 100));
-  
+
   return (
     <div className={`genui-progress ${variant}`}>
       {label && <div className="genui-progress-label">{label}</div>}
       <div className="genui-progress-track">
-        <motion.div 
+        <motion.div
           className={`genui-progress-bar ${animated ? 'animated' : ''}`}
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
@@ -202,14 +204,13 @@ export const Badge = ({ children, variant = 'default', size = 'md', icon }) => (
 
 export const CodeBlock = ({ code, language = 'python', title, lineNumbers = true, maxHeight = '400px', highlightLines = [] }) => {
   const [copied, setCopied] = useState(false);
-  const lines = code?.split('\n') || [];
-  
+
   const copyCode = () => {
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-  
+
   return (
     <div className="genui-code-block">
       {title && (
@@ -223,19 +224,29 @@ export const CodeBlock = ({ code, language = 'python', title, lineNumbers = true
           </div>
         </div>
       )}
-      <pre className="genui-code-pre" style={{ maxHeight }}>
-        <code className={`language-${language}`}>
-          {lines.map((line, i) => (
-            <div 
-              key={i} 
-              className={`genui-code-line ${highlightLines.includes(i + 1) ? 'highlighted' : ''}`}
-            >
-              {lineNumbers && <span className="genui-line-number">{i + 1}</span>}
-              <span className="genui-line-content">{line || ' '}</span>
-            </div>
-          ))}
-        </code>
-      </pre>
+      <SyntaxHighlighter
+        language={language}
+        style={vscDarkPlus}
+        showLineNumbers={lineNumbers}
+        wrapLongLines={true}
+        lineProps={lineNo => {
+          const style = {};
+          if (highlightLines.includes(lineNo)) {
+            style.backgroundColor = 'rgba(249, 115, 22, 0.15)';
+          }
+          return { style };
+        }}
+        customStyle={{
+          margin: 0,
+          borderRadius: title ? '0 0 8px 8px' : '8px',
+          fontSize: '13px',
+          maxHeight,
+          background: '#1e1e2e',
+        }}
+        lineNumberStyle={{ color: '#555', minWidth: '2.5em', paddingRight: '1em' }}
+      >
+        {code || ''}
+      </SyntaxHighlighter>
     </div>
   );
 };
@@ -243,15 +254,15 @@ export const CodeBlock = ({ code, language = 'python', title, lineNumbers = true
 export const CodeDiff = ({ before, after, title, language = 'python', expanded: defaultExpanded = true }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [viewMode, setViewMode] = useState('split'); // 'split' | 'unified'
-  
+
   const beforeLines = before?.split('\n') || [];
   const afterLines = after?.split('\n') || [];
-  
+
   // Simple diff - find changed lines
   const maxLines = Math.max(beforeLines.length, afterLines.length);
-  
+
   return (
-    <motion.div 
+    <motion.div
       className="genui-code-diff"
       variants={slideIn}
       initial="initial"
@@ -266,13 +277,13 @@ export const CodeDiff = ({ before, after, title, language = 'python', expanded: 
           </Badge>
         </div>
         <div className="genui-diff-actions">
-          <button 
+          <button
             className={`genui-view-btn ${viewMode === 'split' ? 'active' : ''}`}
             onClick={(e) => { e.stopPropagation(); setViewMode('split'); }}
           >
             Split
           </button>
-          <button 
+          <button
             className={`genui-view-btn ${viewMode === 'unified' ? 'active' : ''}`}
             onClick={(e) => { e.stopPropagation(); setViewMode('unified'); }}
           >
@@ -281,10 +292,10 @@ export const CodeDiff = ({ before, after, title, language = 'python', expanded: 
           <span className="genui-expand-icon">{expanded ? '▼' : '▶'}</span>
         </div>
       </div>
-      
+
       <AnimatePresence>
         {expanded && (
-          <motion.div 
+          <motion.div
             className={`genui-diff-content ${viewMode}`}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -322,7 +333,7 @@ export const CodeDiff = ({ before, after, title, language = 'python', expanded: 
                     const beforeLine = beforeLines[i];
                     const afterLine = afterLines[i];
                     const isDifferent = beforeLine !== afterLine;
-                    
+
                     return (
                       <React.Fragment key={i}>
                         {isDifferent && beforeLine !== undefined && (
@@ -361,13 +372,13 @@ export const CodeDiff = ({ before, after, title, language = 'python', expanded: 
 
 // ==================== AGENT-SPECIFIC COMPONENTS ====================
 
-export const AgentStatusCard = ({ 
-  agentName, 
-  icon, 
-  phase, 
-  message, 
-  progress, 
-  fixes = [], 
+export const AgentStatusCard = ({
+  agentName,
+  icon,
+  phase,
+  message,
+  progress,
+  fixes = [],
   stats = {},
   duration,
   variant = 'default'
@@ -381,12 +392,12 @@ export const AgentStatusCard = ({
     complete: { label: 'Complete', color: '#10b981' },
     error: { label: 'Error', color: '#ef4444' }
   };
-  
+
   const { label: phaseLabel, color: phaseColor } = phaseConfig[phase] || phaseConfig.idle;
   const isActive = ['starting', 'analyzing', 'processing', 'fixing'].includes(phase);
-  
+
   return (
-    <motion.div 
+    <motion.div
       className={`genui-agent-card ${variant} ${phase}`}
       variants={slideIn}
       initial="initial"
@@ -410,15 +421,15 @@ export const AgentStatusCard = ({
           </Badge>
         )}
       </div>
-      
+
       <div className="genui-agent-message">{message}</div>
-      
+
       {progress !== undefined && isActive && (
         <ProgressBar value={progress} variant="primary" animated />
       )}
-      
+
       {fixes.length > 0 && (
-        <motion.div 
+        <motion.div
           className="genui-agent-fixes"
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
@@ -443,7 +454,7 @@ export const AgentStatusCard = ({
           </div>
         </motion.div>
       )}
-      
+
       {Object.keys(stats).length > 0 && (
         <div className="genui-agent-stats">
           {Object.entries(stats).map(([key, value]) => (
@@ -457,13 +468,13 @@ export const AgentStatusCard = ({
   );
 };
 
-export const FixCard = ({ 
-  agent, 
-  description, 
-  severity, 
-  before, 
-  after, 
-  line, 
+export const FixCard = ({
+  agent,
+  description,
+  severity,
+  before,
+  after,
+  line,
   category,
   applied = true,
   onApply,
@@ -472,17 +483,17 @@ export const FixCard = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const hasDiff = before && after;
-  
+
   return (
-    <motion.div 
+    <motion.div
       className={`genui-fix-card ${severity} ${applied ? 'applied' : ''}`}
       variants={slideInLeft}
       initial="initial"
       animate="animate"
       layout
     >
-      <div 
-        className="genui-fix-header" 
+      <div
+        className="genui-fix-header"
         onClick={expandable && hasDiff ? () => setExpanded(!expanded) : undefined}
       >
         <div className="genui-fix-meta">
@@ -497,12 +508,12 @@ export const FixCard = ({
           )}
         </div>
       </div>
-      
+
       <div className="genui-fix-description">{description}</div>
-      
+
       <AnimatePresence>
         {expanded && hasDiff && (
-          <motion.div 
+          <motion.div
             className="genui-fix-diff"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -519,7 +530,7 @@ export const FixCard = ({
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {(onApply || onRevert) && (
         <div className="genui-fix-actions">
           {!applied && onApply && (
@@ -539,7 +550,7 @@ export const FixCard = ({
 };
 
 export const VulnerabilityCard = ({ type, severity, description, line, pattern, fixAvailable }) => (
-  <motion.div 
+  <motion.div
     className={`genui-vulnerability-card ${severity}`}
     variants={slideIn}
     initial="initial"
@@ -568,7 +579,7 @@ export const WorkflowTimeline = ({ steps, orientation = 'horizontal' }) => (
   <div className={`genui-workflow-timeline ${orientation}`}>
     {steps.map((step, index) => (
       <React.Fragment key={step.id}>
-        <motion.div 
+        <motion.div
           className={`genui-workflow-step ${step.status}`}
           variants={scaleIn}
           initial="initial"
@@ -597,7 +608,7 @@ export const WorkflowTimeline = ({ steps, orientation = 'horizontal' }) => (
 export const Timeline = ({ items, animated = true }) => (
   <div className="genui-timeline">
     {items.map((item, index) => (
-      <motion.div 
+      <motion.div
         key={item.id || index}
         className={`genui-timeline-item ${item.status || ''}`}
         variants={animated ? slideInLeft : undefined}
@@ -622,7 +633,7 @@ export const Timeline = ({ items, animated = true }) => (
 
 export const Expandable = ({ title, children, expanded: defaultExpanded = false, icon }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  
+
   return (
     <div className="genui-expandable">
       <button className="genui-expandable-header" onClick={() => setExpanded(!expanded)}>
@@ -632,7 +643,7 @@ export const Expandable = ({ title, children, expanded: defaultExpanded = false,
       </button>
       <AnimatePresence>
         {expanded && (
-          <motion.div 
+          <motion.div
             className="genui-expandable-content"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -648,14 +659,14 @@ export const Expandable = ({ title, children, expanded: defaultExpanded = false,
 
 export const Tabs = ({ tabs, activeTab, onChange }) => {
   const [active, setActive] = useState(activeTab || tabs[0]?.id);
-  
+
   const handleChange = (tabId) => {
     setActive(tabId);
     onChange?.(tabId);
   };
-  
+
   const activeContent = tabs.find(t => t.id === active)?.content;
-  
+
   return (
     <div className="genui-tabs">
       <div className="genui-tabs-header">
@@ -692,7 +703,7 @@ export const Tabs = ({ tabs, activeTab, onChange }) => {
 export const DataTable = ({ columns, rows, title, sortable = true, onRowClick }) => {
   const [sortKey, setSortKey] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
-  
+
   const sortedRows = useMemo(() => {
     if (!sortKey) return rows;
     return [...rows].sort((a, b) => {
@@ -704,7 +715,7 @@ export const DataTable = ({ columns, rows, title, sortable = true, onRowClick })
       return 0;
     });
   }, [rows, sortKey, sortOrder]);
-  
+
   const handleSort = (key) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -713,7 +724,7 @@ export const DataTable = ({ columns, rows, title, sortable = true, onRowClick })
       setSortOrder('asc');
     }
   };
-  
+
   return (
     <div className="genui-table-wrapper">
       {title && <h3 className="genui-table-title">{title}</h3>}
@@ -721,7 +732,7 @@ export const DataTable = ({ columns, rows, title, sortable = true, onRowClick })
         <thead>
           <tr>
             {columns.map(col => (
-              <th 
+              <th
                 key={col.key}
                 className={sortable ? 'sortable' : ''}
                 onClick={sortable ? () => handleSort(col.key) : undefined}
@@ -739,7 +750,7 @@ export const DataTable = ({ columns, rows, title, sortable = true, onRowClick })
         </thead>
         <tbody>
           {sortedRows.map((row, i) => (
-            <motion.tr 
+            <motion.tr
               key={row.id || i}
               onClick={() => onRowClick?.(row)}
               className={onRowClick ? 'clickable' : ''}
@@ -762,9 +773,9 @@ export const DataTable = ({ columns, rows, title, sortable = true, onRowClick })
 
 export const Alert = ({ message, title, severity = 'info', dismissible = true, onDismiss }) => {
   const [visible, setVisible] = useState(true);
-  
+
   if (!visible) return null;
-  
+
   const icons = {
     info: 'ℹ️',
     success: '✅',
@@ -772,9 +783,9 @@ export const Alert = ({ message, title, severity = 'info', dismissible = true, o
     error: '❌',
     critical: '🚨'
   };
-  
+
   return (
-    <motion.div 
+    <motion.div
       className={`genui-alert ${severity}`}
       variants={slideIn}
       initial="initial"
@@ -787,7 +798,7 @@ export const Alert = ({ message, title, severity = 'info', dismissible = true, o
         <span className="genui-alert-message">{message}</span>
       </div>
       {dismissible && (
-        <button 
+        <button
           className="genui-alert-dismiss"
           onClick={() => { setVisible(false); onDismiss?.(); }}
         >
@@ -814,32 +825,32 @@ const GenUIComponents = {
   Card,
   Grid,
   Divider,
-  
+
   // Data Display
   StatCard,
   ProgressBar,
   Badge,
   SeverityBadge,
   StatusIndicator,
-  
+
   // Code
   CodeBlock,
   CodeDiff,
-  
+
   // Agent Specific
   AgentStatusCard,
   FixCard,
   VulnerabilityCard,
-  
+
   // Timeline/Workflow
   WorkflowTimeline,
   Timeline,
-  
+
   // Interactive
   Expandable,
   Tabs,
   DataTable,
-  
+
   // Alerts
   Alert
 };

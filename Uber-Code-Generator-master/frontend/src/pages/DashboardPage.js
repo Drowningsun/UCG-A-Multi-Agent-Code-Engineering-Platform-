@@ -206,7 +206,7 @@ const DashboardPage = () => {
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
                   <div className="stat-icon">📊</div>
                   <div className="stat-info">
-                    <span className="stat-value"><AnimatedCounter target={sessions.length} duration={800} /></span>
+                    <span className="stat-value"><AnimatedCounter value={sessions.length} duration={800} /></span>
                     <span className="stat-label">Total Sessions</span>
                   </div>
                 </SpotlightCard>
@@ -215,7 +215,7 @@ const DashboardPage = () => {
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
                   <div className="stat-icon">💬</div>
                   <div className="stat-info">
-                    <span className="stat-value"><AnimatedCounter target={sessions.filter(s => s.message_count > 0).length} duration={800} /></span>
+                    <span className="stat-value"><AnimatedCounter value={sessions.filter(s => s.message_count > 0).length} duration={800} /></span>
                     <span className="stat-label">Active Chats</span>
                   </div>
                 </SpotlightCard>
@@ -224,7 +224,7 @@ const DashboardPage = () => {
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
                   <div className="stat-icon">✨</div>
                   <div className="stat-info">
-                    <span className="stat-value"><AnimatedCounter target={sessions.reduce((acc, s) => acc + (s.message_count || 0), 0)} duration={1200} /></span>
+                    <span className="stat-value"><AnimatedCounter value={sessions.reduce((acc, s) => acc + (s.message_count || 0), 0)} duration={1200} /></span>
                     <span className="stat-label">Total Messages</span>
                   </div>
                 </SpotlightCard>
@@ -233,7 +233,7 @@ const DashboardPage = () => {
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
                   <div className="stat-icon">🤖</div>
                   <div className="stat-info">
-                    <span className="stat-value"><AnimatedCounter target={4} duration={600} /></span>
+                    <span className="stat-value"><AnimatedCounter value={4} duration={600} /></span>
                     <span className="stat-label">Active Agents</span>
                   </div>
                 </SpotlightCard>
