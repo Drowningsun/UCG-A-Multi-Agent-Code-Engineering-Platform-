@@ -52,6 +52,9 @@ const GenUIChatPageV2 = () => {
   // Edit message state
   const [editingMessageIndex, setEditingMessageIndex] = useState(null);
   const [editingContent, setEditingContent] = useState('');
+  
+  // Selected message index for viewing previous results
+  const [selectedMessageIndex, setSelectedMessageIndex] = useState(null);
 
   // Panel state
   const [rightPanelTab, setRightPanelTab] = useState('code'); // 'code', 'agents', 'fixes'
@@ -143,6 +146,45 @@ const GenUIChatPageV2 = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, token]);
 
+  // Helper to build a result object from a message's stored data
+  const buildResultFromMessage = (msg) => {
+    const workflowData = msg.workflow_data || {};
+    const restoredStats = workflowData.stats || {};
+    return {
+      code: msg.code_output,
+      original_code: workflowData.original_code,
+      all_fixes: workflowData.all_fixes || [],
+      code_was_fixed: workflowData.code_was_fixed,
+      total_fixes: workflowData.total_fixes || 0,
+      validation: workflowData.validation,
+      tests: workflowData.tests,
+      security: workflowData.security,
+      stats: {
+        totalDuration: restoredStats.totalDuration || restoredStats.total_duration || null,
+        totalLines: restoredStats.totalLines || restoredStats.total_lines || 0,
+        totalFixes: restoredStats.totalFixes || restoredStats.total_fixes || 0
+      }
+    };
+  };
+
+  // Handle clicking an assistant message to view its result in the right panel
+  const selectMessage = useCallback((index) => {
+    const msg = messages[index];
+    if (!msg || msg.role !== 'assistant' || !msg.hasResult) return;
+
+    setSelectedMessageIndex(index);
+    const builtResult = buildResultFromMessage(msg);
+    setResult(builtResult);
+    setShowOriginal(false);
+    setShowRightPanel(true);
+    setRightPanelTab('code');
+
+    // Restore agent messages for this specific message
+    if (msg.workflow_data?.agent_messages) {
+      setAgentMessages(msg.workflow_data.agent_messages);
+    }
+  }, [messages]);
+
   const loadSession = async () => {
     if (!sessionId || !token) return;
     try {
@@ -158,33 +200,16 @@ const GenUIChatPageV2 = () => {
         }));
         setMessages(loadedMessages);
 
-        // Find last assistant message with code and restore full result
-        const lastAssistantMsg = [...response.data.messages].reverse().find(m => m.code_output);
-        if (lastAssistantMsg) {
-          const workflowData = lastAssistantMsg.workflow_data || {};
-
-          // Ensure stats has proper defaults
-          const restoredStats = workflowData.stats || {};
-
-          setResult({
-            code: lastAssistantMsg.code_output,
-            original_code: workflowData.original_code,
-            all_fixes: workflowData.all_fixes || [],
-            code_was_fixed: workflowData.code_was_fixed,
-            total_fixes: workflowData.total_fixes || 0,
-            validation: workflowData.validation,
-            tests: workflowData.tests,
-            security: workflowData.security,
-            stats: {
-              totalDuration: restoredStats.totalDuration || restoredStats.total_duration || null,
-              totalLines: restoredStats.totalLines || restoredStats.total_lines || 0,
-              totalFixes: restoredStats.totalFixes || restoredStats.total_fixes || 0
-            }
-          });
+        // Find last assistant message with code and select it
+        const lastAssistantIndex = loadedMessages.map((m, i) => ({ ...m, i })).filter(m => m.hasResult).pop()?.i;
+        if (lastAssistantIndex !== undefined) {
+          const lastMsg = loadedMessages[lastAssistantIndex];
+          setSelectedMessageIndex(lastAssistantIndex);
+          setResult(buildResultFromMessage(lastMsg));
 
           // Restore agent messages if available
-          if (workflowData.agent_messages) {
-            setAgentMessages(workflowData.agent_messages);
+          if (lastMsg.workflow_data?.agent_messages) {
+            setAgentMessages(lastMsg.workflow_data.agent_messages);
           }
         }
       }
@@ -448,11 +473,28 @@ const GenUIChatPageV2 = () => {
       // Update the result state with final values including original_code
       setResult(savedResult);
 
-      setMessages(prev => [...prev, {
+      const newAssistantMsg = {
         role: 'assistant',
         content: assistantContent,
+        code_output: fullCode,
+        workflow_data: {
+          original_code: savedResult.original_code,
+          all_fixes: finalAllFixes,
+          code_was_fixed: savedResult.code_was_fixed,
+          total_fixes: totalFixCount,
+          validation: savedResult.validation,
+          tests: savedResult.tests,
+          security: savedResult.security,
+          stats: savedResult.stats,
+          agent_messages: localAgentMessages.slice(-20)
+        },
         hasResult: true
-      }]);
+      };
+      setMessages(prev => {
+        const updated = [...prev, newAssistantMsg];
+        setSelectedMessageIndex(updated.length - 1);
+        return updated;
+      });
 
       if (sessionId && token) {
         try {
@@ -862,10 +904,11 @@ const GenUIChatPageV2 = () => {
             {messages.map((msg, index) => (
               <motion.div
                 key={index}
-                className={`message ${msg.role} ${editingMessageIndex === index ? 'editing' : ''}`}
+                className={`message ${msg.role} ${editingMessageIndex === index ? 'editing' : ''} ${msg.role === 'assistant' && msg.hasResult && selectedMessageIndex === index ? 'selected' : ''} ${msg.role === 'assistant' && msg.hasResult ? 'clickable' : ''}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
+                onClick={() => msg.role === 'assistant' && msg.hasResult && selectMessage(index)}
               >
                 <div className="message-avatar">
                   {msg.role === 'user' ? '👤' : '🤖'}
@@ -905,8 +948,10 @@ const GenUIChatPageV2 = () => {
                   )}
 
                   {/* Code description for assistant messages with results */}
-                  {msg.role === 'assistant' && msg.hasResult && result && (() => {
-                    const desc = generateDescription(result.code, messages[index - 1]?.content);
+                  {msg.role === 'assistant' && msg.hasResult && msg.code_output && (() => {
+                    const desc = generateDescription(msg.code_output, messages[index - 1]?.content);
+                    const msgFixes = msg.workflow_data?.all_fixes || [];
+                    const msgTotalFixes = msgFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
                     return desc ? (
                       <div className="code-description">
                         <div className="desc-header">
@@ -944,8 +989,8 @@ const GenUIChatPageV2 = () => {
 
                         <div className="desc-footer">
                           <span className="desc-structure">{desc.structure}</span>
-                          {totalFixes > 0 && (
-                            <span className="desc-fixes">🔧 {totalFixes} auto-fixes applied</span>
+                          {msgTotalFixes > 0 && (
+                            <span className="desc-fixes">🔧 {msgTotalFixes} auto-fixes applied</span>
                           )}
                         </div>
                       </div>

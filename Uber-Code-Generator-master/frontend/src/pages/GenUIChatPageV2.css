@@ -411,6 +411,24 @@
   animation: fadeIn 0.3s ease;
 }
 
+.message.clickable {
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 12px;
+  margin: -12px;
+  border-left: 3px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.message.clickable:hover {
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.message.selected {
+  background: rgba(139, 92, 246, 0.08);
+  border-left-color: var(--genui-primary);
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
