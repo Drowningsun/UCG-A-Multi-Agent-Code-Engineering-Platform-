@@ -6,6 +6,7 @@ from .code_generator import CodeGeneratorAgent
 from .validator import ValidationAgent
 from .testing import TestingAgent
 from .security import SecurityAgent
+from .planner import ProjectPlannerAgent
 
 __all__ = [
     'BaseAgent',
@@ -13,6 +14,7 @@ __all__ = [
     'ValidationAgent', 
     'TestingAgent',
     'SecurityAgent',
+    'ProjectPlannerAgent',
     'call_groq_api',
     'GROQ_API_KEY',
     'GROQ_BASE_URL',
@@ -21,6 +23,11 @@ __all__ = [
 
 # Agent descriptions for display
 AGENT_INFO = {
+    'planner': {
+        'name': 'Project Planner',
+        'icon': '📋',
+        'description': 'Classifies project scope and plans multi-file structure'
+    },
     'code_generator': {
         'name': 'Code Generator',
         'icon': '🚀',

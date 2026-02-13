@@ -30,7 +30,7 @@ def call_groq_api(api_key, system_prompt, user_prompt, max_tokens=2000):
         response = requests.post(
             GROQ_BASE_URL,
             headers={
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": f"Bearer {key}",
                 "Content-Type": "application/json"
             },
             json={

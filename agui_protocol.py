@@ -1,5 +1,13 @@
-# AG-UI Protocol - Agent-User Interaction Layer for Generative UI
-# This module implements a bidirectional protocol for real-time UI generation
+# AG-UI Protocol Implementation
+# Implements the Agent-User Interaction Protocol (https://docs.ag-ui.com)
+# Standardized event-based communication between AI agents and frontend UI
+#
+# Event Types (per AG-UI spec):
+#   Lifecycle: RUN_STARTED, RUN_FINISHED, RUN_ERROR, STEP_STARTED, STEP_FINISHED
+#   Text:      TEXT_MESSAGE_START, TEXT_MESSAGE_CONTENT, TEXT_MESSAGE_END
+#   Tool:      TOOL_CALL_START, TOOL_CALL_ARGS, TOOL_CALL_END, TOOL_CALL_RESULT
+#   State:     STATE_SNAPSHOT, STATE_DELTA, MESSAGES_SNAPSHOT
+#   Special:   RAW, CUSTOM
 
 from enum import Enum
 from typing import Optional, List, Dict, Any, Union
@@ -9,85 +17,190 @@ import json
 import uuid
 
 
-class UIComponentType(str, Enum):
-    """Types of UI components agents can generate"""
-    # Layout
-    CARD = "card"
-    CONTAINER = "container"
-    GRID = "grid"
-    COLUMN = "column"
-    ROW = "row"
-    DIVIDER = "divider"
-    SPACER = "spacer"
-    
-    # Data Display
-    TEXT = "text"
-    CODE_BLOCK = "code_block"
-    CODE_DIFF = "code_diff"
-    TABLE = "table"
-    LIST = "list"
-    BADGE = "badge"
-    STAT = "stat"
-    PROGRESS = "progress"
-    CHART = "chart"
-    
-    # Feedback
-    ALERT = "alert"
-    TOAST = "toast"
-    TIMELINE = "timeline"
-    STEP_INDICATOR = "step_indicator"
-    
-    # Interactive
-    BUTTON = "button"
-    BUTTON_GROUP = "button_group"
-    FORM = "form"
-    INPUT = "input"
-    SELECT = "select"
-    CHECKBOX = "checkbox"
-    TOGGLE = "toggle"
-    TABS = "tabs"
-    ACCORDION = "accordion"
-    EXPANDABLE = "expandable"
-    
-    # Agent-specific
-    AGENT_STATUS = "agent_status"
-    FIX_CARD = "fix_card"
-    VULNERABILITY_CARD = "vulnerability_card"
-    TEST_RESULT = "test_result"
-    SECURITY_SCAN = "security_scan"
-    WORKFLOW_GRAPH = "workflow_graph"
+# ==================== AG-UI Event Types (Standard) ====================
+
+class EventType(str, Enum):
+    """Standard AG-UI event types as defined by the protocol specification."""
+
+    # Lifecycle Events
+    RUN_STARTED = "RUN_STARTED"
+    RUN_FINISHED = "RUN_FINISHED"
+    RUN_ERROR = "RUN_ERROR"
+    STEP_STARTED = "STEP_STARTED"
+    STEP_FINISHED = "STEP_FINISHED"
+
+    # Text Message Events
+    TEXT_MESSAGE_START = "TEXT_MESSAGE_START"
+    TEXT_MESSAGE_CONTENT = "TEXT_MESSAGE_CONTENT"
+    TEXT_MESSAGE_END = "TEXT_MESSAGE_END"
+
+    # Tool Call Events
+    TOOL_CALL_START = "TOOL_CALL_START"
+    TOOL_CALL_ARGS = "TOOL_CALL_ARGS"
+    TOOL_CALL_END = "TOOL_CALL_END"
+    TOOL_CALL_RESULT = "TOOL_CALL_RESULT"
+
+    # State Management Events
+    STATE_SNAPSHOT = "STATE_SNAPSHOT"
+    STATE_DELTA = "STATE_DELTA"
+    MESSAGES_SNAPSHOT = "MESSAGES_SNAPSHOT"
+
+    # Special Events
+    RAW = "RAW"
+    CUSTOM = "CUSTOM"
 
 
-class UIEventType(str, Enum):
-    """Events that can be sent between agent and UI"""
-    # Lifecycle
-    START = "start"
-    PROGRESS = "progress"
-    COMPLETE = "complete"
-    ERROR = "error"
-    
-    # UI Updates
-    RENDER = "render"
-    UPDATE = "update"
-    REMOVE = "remove"
-    REPLACE = "replace"
-    
-    # User Actions
-    CLICK = "click"
-    SUBMIT = "submit"
-    SELECT = "select"
-    DISMISS = "dismiss"
-    EXPAND = "expand"
-    COLLAPSE = "collapse"
-    
-    # Data
-    DATA_UPDATE = "data_update"
-    STREAM_CHUNK = "stream_chunk"
-    STREAM_END = "stream_end"
+# ==================== Base Event ====================
 
+class BaseEvent(BaseModel):
+    """
+    Base event following AG-UI protocol spec.
+    All events share: type, timestamp, rawEvent (optional).
+    """
+    type: EventType
+    timestamp: Optional[float] = Field(default_factory=lambda: datetime.now().timestamp())
+    rawEvent: Optional[Dict[str, Any]] = None
+
+    class Config:
+        use_enum_values = True
+
+    def to_sse(self) -> str:
+        """Serialize to Server-Sent Event format."""
+        return f"data: {self.model_dump_json()}\n\n"
+
+
+# ==================== Lifecycle Events ====================
+
+class RunStartedEvent(BaseEvent):
+    """Signals the start of an agent run."""
+    type: EventType = EventType.RUN_STARTED
+    threadId: str
+    runId: str
+    parentRunId: Optional[str] = None
+    input: Optional[Dict[str, Any]] = None
+
+
+class RunFinishedEvent(BaseEvent):
+    """Signals the successful completion of an agent run."""
+    type: EventType = EventType.RUN_FINISHED
+    threadId: str
+    runId: str
+    result: Optional[Dict[str, Any]] = None
+
+
+class RunErrorEvent(BaseEvent):
+    """Signals an error during an agent run."""
+    type: EventType = EventType.RUN_ERROR
+    message: str
+    code: Optional[str] = None
+
+
+class StepStartedEvent(BaseEvent):
+    """Signals the start of a step within an agent run."""
+    type: EventType = EventType.STEP_STARTED
+    stepName: str
+
+
+class StepFinishedEvent(BaseEvent):
+    """Signals the completion of a step within an agent run."""
+    type: EventType = EventType.STEP_FINISHED
+    stepName: str
+
+
+# ==================== Text Message Events ====================
+
+class TextMessageStartEvent(BaseEvent):
+    """Signals the start of a text message."""
+    type: EventType = EventType.TEXT_MESSAGE_START
+    messageId: str
+    role: str = "assistant"
+
+
+class TextMessageContentEvent(BaseEvent):
+    """Represents a chunk of content in a streaming text message."""
+    type: EventType = EventType.TEXT_MESSAGE_CONTENT
+    messageId: str
+    delta: str
+
+
+class TextMessageEndEvent(BaseEvent):
+    """Signals the end of a text message."""
+    type: EventType = EventType.TEXT_MESSAGE_END
+    messageId: str
+
+
+# ==================== Tool Call Events ====================
+
+class ToolCallStartEvent(BaseEvent):
+    """Signals the start of a tool call (agent fix/analysis)."""
+    type: EventType = EventType.TOOL_CALL_START
+    toolCallId: str
+    toolCallName: str
+    parentMessageId: Optional[str] = None
+
+
+class ToolCallArgsEvent(BaseEvent):
+    """Represents a chunk of argument data for a tool call."""
+    type: EventType = EventType.TOOL_CALL_ARGS
+    toolCallId: str
+    delta: str
+
+
+class ToolCallEndEvent(BaseEvent):
+    """Signals the end of a tool call."""
+    type: EventType = EventType.TOOL_CALL_END
+    toolCallId: str
+
+
+class ToolCallResultEvent(BaseEvent):
+    """Provides the result of a tool call execution."""
+    type: EventType = EventType.TOOL_CALL_RESULT
+    messageId: Optional[str] = None
+    toolCallId: str
+    content: str
+    role: str = "tool"
+
+
+# ==================== State Management Events ====================
+
+class StateSnapshotEvent(BaseEvent):
+    """Provides a complete snapshot of an agent's state."""
+    type: EventType = EventType.STATE_SNAPSHOT
+    snapshot: Dict[str, Any]
+
+
+class StateDeltaEvent(BaseEvent):
+    """Provides a partial update using JSON Patch operations (RFC 6902)."""
+    type: EventType = EventType.STATE_DELTA
+    delta: List[Dict[str, Any]]
+
+
+class MessagesSnapshotEvent(BaseEvent):
+    """Provides a snapshot of all messages in a conversation."""
+    type: EventType = EventType.MESSAGES_SNAPSHOT
+    messages: List[Dict[str, Any]]
+
+
+# ==================== Special Events ====================
+
+class RawEvent(BaseEvent):
+    """Pass-through events from external systems."""
+    type: EventType = EventType.RAW
+    event: Dict[str, Any]
+    source: Optional[str] = None
+
+
+class CustomEvent(BaseEvent):
+    """Application-specific custom events."""
+    type: EventType = EventType.CUSTOM
+    name: str
+    value: Dict[str, Any]
+
+
+# ==================== Domain-Specific Models ====================
 
 class Severity(str, Enum):
-    """Severity levels for issues/fixes"""
+    """Severity levels for code issues."""
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -96,7 +209,7 @@ class Severity(str, Enum):
 
 
 class AgentPhase(str, Enum):
-    """Phases of agent execution"""
+    """Phases of agent execution."""
     IDLE = "idle"
     STARTING = "starting"
     ANALYZING = "analyzing"
@@ -106,604 +219,239 @@ class AgentPhase(str, Enum):
     ERROR = "error"
 
 
-# ==================== UI Component Specs ====================
-
-class UIStyle(BaseModel):
-    """Styling options for UI components"""
-    variant: Optional[str] = None  # primary, secondary, success, warning, danger, info
-    size: Optional[str] = None  # sm, md, lg, xl
-    color: Optional[str] = None
-    background: Optional[str] = None
-    border: Optional[str] = None
-    padding: Optional[str] = None
-    margin: Optional[str] = None
-    animation: Optional[str] = None  # fadeIn, slideIn, pulse, none
-    className: Optional[str] = None
-
-
-class UIAction(BaseModel):
-    """Action that can be triggered from UI"""
-    name: str
-    label: Optional[str] = None
-    icon: Optional[str] = None
-    payload: Optional[Dict[str, Any]] = None
-    confirm: Optional[str] = None  # Confirmation message
-
-
-class UIComponent(BaseModel):
-    """Base UI component specification"""
-    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
-    type: UIComponentType
-    props: Dict[str, Any] = Field(default_factory=dict)
-    children: Optional[List["UIComponent"]] = None
-    style: Optional[UIStyle] = None
-    actions: Optional[List[UIAction]] = None
-    visible: bool = True
-    
-    class Config:
-        use_enum_values = True
-
-
-# ==================== Specialized Component Specs ====================
-
-class CodeDiffSpec(BaseModel):
-    """Specification for code diff component"""
-    before: str
-    after: str
-    language: str = "python"
-    title: Optional[str] = None
-    lineNumbers: bool = True
-    highlightChanges: bool = True
-
-
-class FixCardSpec(BaseModel):
-    """Specification for a fix card (shown when agent fixes code)"""
+class FixSpec(BaseModel):
+    """Specification for a code fix applied by an agent."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     agent: str
     description: str
-    severity: Severity
+    severity: str = "medium"
     category: Optional[str] = None
     line: Optional[int] = None
     before: Optional[str] = None
     after: Optional[str] = None
-    explanation: Optional[str] = None
     applied: bool = True
-    
-    class Config:
-        use_enum_values = True
 
 
-class AgentStatusSpec(BaseModel):
-    """Specification for agent status display"""
-    agentId: str
-    agentName: str
-    icon: str
-    phase: AgentPhase
-    message: str
-    progress: Optional[int] = None  # 0-100
-    stats: Optional[Dict[str, Any]] = None
-    fixes: Optional[List[FixCardSpec]] = None
-    duration: Optional[float] = None  # seconds
-    
-    class Config:
-        use_enum_values = True
-
-
-class WorkflowStepSpec(BaseModel):
-    """Specification for a workflow step"""
+class WorkflowStep(BaseModel):
+    """Specification for a workflow step."""
     id: str
     name: str
     icon: str
-    status: str  # pending, active, complete, error
+    status: str
     message: Optional[str] = None
     duration: Optional[float] = None
 
 
-class TableSpec(BaseModel):
-    """Specification for a data table"""
-    columns: List[Dict[str, Any]]  # {key, label, sortable?, width?}
-    rows: List[Dict[str, Any]]
-    sortable: bool = False
-    filterable: bool = False
-    pagination: Optional[Dict[str, int]] = None  # {page, pageSize, total}
+# ==================== AG-UI Event Factory ====================
 
+class AGUIEvents:
+    """
+    Factory class for creating AG-UI protocol events.
 
-class ChartSpec(BaseModel):
-    """Specification for charts"""
-    chartType: str  # bar, line, pie, donut, radar
-    data: List[Dict[str, Any]]
-    options: Optional[Dict[str, Any]] = None
+    Usage:
+        events = AGUIEvents(thread_id="session_123", run_id="run_456")
+        yield events.run_started().to_sse()
+        yield events.step_started("code_generator").to_sse()
+        yield events.text_message_start("msg_1").to_sse()
+        yield events.text_message_content("msg_1", "chunk").to_sse()
+        yield events.text_message_end("msg_1").to_sse()
+        yield events.step_finished("code_generator").to_sse()
+        yield events.run_finished().to_sse()
+    """
 
+    def __init__(self, thread_id: str = None, run_id: str = None):
+        self.thread_id = thread_id or str(uuid.uuid4())
+        self.run_id = run_id or str(uuid.uuid4())
 
-# ==================== AG-UI Events ====================
+    # --- Lifecycle ---
 
-class AGUIEvent(BaseModel):
-    """Event sent from agent to UI or vice versa"""
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    type: UIEventType
-    timestamp: datetime = Field(default_factory=datetime.now)
-    source: str  # agent_id or "user"
-    target: Optional[str] = None  # component_id or "global"
-    payload: Dict[str, Any] = Field(default_factory=dict)
-    
-    class Config:
-        use_enum_values = True
-    
-    def to_sse(self) -> str:
-        """Convert to Server-Sent Event format"""
-        return f"data: {self.model_dump_json()}\n\n"
+    def run_started(self, input_data: Dict[str, Any] = None) -> RunStartedEvent:
+        return RunStartedEvent(
+            threadId=self.thread_id,
+            runId=self.run_id,
+            input=input_data
+        )
 
+    def run_finished(self, result: Dict[str, Any] = None) -> RunFinishedEvent:
+        return RunFinishedEvent(
+            threadId=self.thread_id,
+            runId=self.run_id,
+            result=result
+        )
 
-class AGUISurface(BaseModel):
-    """A rendering surface that contains UI components"""
-    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
-    components: List[UIComponent] = Field(default_factory=list)
-    dataModel: Dict[str, Any] = Field(default_factory=dict)
+    def run_error(self, message: str, code: str = None) -> RunErrorEvent:
+        return RunErrorEvent(message=message, code=code)
 
+    def step_started(self, step_name: str) -> StepStartedEvent:
+        return StepStartedEvent(stepName=step_name)
 
-# ==================== Agent UI Builders ====================
+    def step_finished(self, step_name: str) -> StepFinishedEvent:
+        return StepFinishedEvent(stepName=step_name)
 
-class AGUIBuilder:
-    """Builder class for creating AG-UI components programmatically"""
-    
-    @staticmethod
-    def agent_card(
-        agent_name: str,
-        icon: str,
-        phase: AgentPhase,
-        message: str,
-        fixes: Optional[List[FixCardSpec]] = None,
-        stats: Optional[Dict[str, Any]] = None,
-        progress: Optional[int] = None
-    ) -> UIComponent:
-        """Create an agent status card"""
-        return UIComponent(
-            type=UIComponentType.AGENT_STATUS,
-            props={
+    # --- Text Messages ---
+
+    def text_message_start(self, message_id: str, role: str = "assistant") -> TextMessageStartEvent:
+        return TextMessageStartEvent(messageId=message_id, role=role)
+
+    def text_message_content(self, message_id: str, delta: str) -> TextMessageContentEvent:
+        return TextMessageContentEvent(messageId=message_id, delta=delta)
+
+    def text_message_end(self, message_id: str) -> TextMessageEndEvent:
+        return TextMessageEndEvent(messageId=message_id)
+
+    # --- Tool Calls ---
+
+    def tool_call_start(self, tool_call_id: str, tool_name: str, parent_message_id: str = None) -> ToolCallStartEvent:
+        return ToolCallStartEvent(
+            toolCallId=tool_call_id,
+            toolCallName=tool_name,
+            parentMessageId=parent_message_id
+        )
+
+    def tool_call_args(self, tool_call_id: str, delta: str) -> ToolCallArgsEvent:
+        return ToolCallArgsEvent(toolCallId=tool_call_id, delta=delta)
+
+    def tool_call_end(self, tool_call_id: str) -> ToolCallEndEvent:
+        return ToolCallEndEvent(toolCallId=tool_call_id)
+
+    def tool_call_result(self, tool_call_id: str, content: str, message_id: str = None) -> ToolCallResultEvent:
+        return ToolCallResultEvent(
+            toolCallId=tool_call_id,
+            content=content,
+            messageId=message_id
+        )
+
+    # --- State Management ---
+
+    def state_snapshot(self, snapshot: Dict[str, Any]) -> StateSnapshotEvent:
+        return StateSnapshotEvent(snapshot=snapshot)
+
+    def state_delta(self, operations: List[Dict[str, Any]]) -> StateDeltaEvent:
+        return StateDeltaEvent(delta=operations)
+
+    def messages_snapshot(self, messages: List[Dict[str, Any]]) -> MessagesSnapshotEvent:
+        return MessagesSnapshotEvent(messages=messages)
+
+    # --- Special Events ---
+
+    def raw(self, event: Dict[str, Any], source: str = None) -> RawEvent:
+        return RawEvent(event=event, source=source)
+
+    def custom(self, name: str, value: Dict[str, Any]) -> CustomEvent:
+        return CustomEvent(name=name, value=value)
+
+    # --- Convenience: Domain-specific Custom Events ---
+
+    def workflow_update(self, steps: list) -> CustomEvent:
+        """Emit workflow update as CUSTOM event."""
+        return self.custom(
+            name="workflow_update",
+            value={"steps": [s.model_dump() if hasattr(s, "model_dump") else s for s in steps]}
+        )
+
+    def agent_activity(self, agent_name: str, icon: str, phase: str,
+                       message: str, progress: int = None,
+                       stats: Dict[str, Any] = None) -> CustomEvent:
+        """Emit agent activity status as CUSTOM event."""
+        return self.custom(
+            name="agent_activity",
+            value={
                 "agentName": agent_name,
                 "icon": icon,
-                "phase": phase.value if isinstance(phase, AgentPhase) else phase,
-                "message": message,
-                "fixes": [f.model_dump() if hasattr(f, 'model_dump') else f for f in (fixes or [])],
-                "stats": stats or {},
-                "progress": progress
-            },
-            style=UIStyle(animation="slideIn")
-        )
-    
-    @staticmethod
-    def fix_card(
-        agent: str,
-        description: str,
-        severity: Severity,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
-        line: Optional[int] = None,
-        category: Optional[str] = None
-    ) -> UIComponent:
-        """Create a fix card showing what was changed"""
-        return UIComponent(
-            type=UIComponentType.FIX_CARD,
-            props={
-                "agent": agent,
-                "description": description,
-                "severity": severity.value if isinstance(severity, Severity) else severity,
-                "before": before,
-                "after": after,
-                "line": line,
-                "category": category,
-                "applied": True
-            },
-            style=UIStyle(animation="fadeIn")
-        )
-    
-    @staticmethod
-    def code_diff(
-        before: str,
-        after: str,
-        title: Optional[str] = None,
-        language: str = "python"
-    ) -> UIComponent:
-        """Create a code diff component"""
-        return UIComponent(
-            type=UIComponentType.CODE_DIFF,
-            props={
-                "before": before,
-                "after": after,
-                "title": title,
-                "language": language,
-                "lineNumbers": True,
-                "highlightChanges": True
-            }
-        )
-    
-    @staticmethod
-    def progress_bar(
-        value: int,
-        max_value: int = 100,
-        label: Optional[str] = None,
-        variant: str = "primary"
-    ) -> UIComponent:
-        """Create a progress bar"""
-        return UIComponent(
-            type=UIComponentType.PROGRESS,
-            props={
-                "value": value,
-                "max": max_value,
-                "label": label
-            },
-            style=UIStyle(variant=variant)
-        )
-    
-    @staticmethod
-    def workflow_timeline(steps: List[WorkflowStepSpec]) -> UIComponent:
-        """Create a workflow timeline"""
-        return UIComponent(
-            type=UIComponentType.TIMELINE,
-            props={
-                "steps": [s.model_dump() if hasattr(s, 'model_dump') else s for s in steps],
-                "orientation": "horizontal"
-            }
-        )
-    
-    @staticmethod
-    def stat_card(
-        label: str,
-        value: Union[str, int, float],
-        icon: Optional[str] = None,
-        change: Optional[str] = None,
-        variant: str = "default"
-    ) -> UIComponent:
-        """Create a statistics card"""
-        return UIComponent(
-            type=UIComponentType.STAT,
-            props={
-                "label": label,
-                "value": value,
-                "icon": icon,
-                "change": change
-            },
-            style=UIStyle(variant=variant)
-        )
-    
-    @staticmethod
-    def alert(
-        message: str,
-        severity: Severity,
-        title: Optional[str] = None,
-        dismissible: bool = True
-    ) -> UIComponent:
-        """Create an alert component"""
-        return UIComponent(
-            type=UIComponentType.ALERT,
-            props={
-                "message": message,
-                "title": title,
-                "dismissible": dismissible
-            },
-            style=UIStyle(variant=severity.value if isinstance(severity, Severity) else severity),
-            actions=[UIAction(name="dismiss", icon="x")] if dismissible else None
-        )
-    
-    @staticmethod
-    def vulnerability_card(
-        vuln_type: str,
-        severity: Severity,
-        description: str,
-        line: Optional[int] = None,
-        pattern: Optional[str] = None,
-        fix_available: bool = False
-    ) -> UIComponent:
-        """Create a vulnerability card"""
-        return UIComponent(
-            type=UIComponentType.VULNERABILITY_CARD,
-            props={
-                "type": vuln_type,
-                "severity": severity.value if isinstance(severity, Severity) else severity,
-                "description": description,
-                "line": line,
-                "pattern": pattern,
-                "fixAvailable": fix_available
-            },
-            style=UIStyle(variant=severity.value if isinstance(severity, Severity) else severity)
-        )
-    
-    @staticmethod
-    def data_table(
-        columns: List[Dict[str, Any]],
-        rows: List[Dict[str, Any]],
-        title: Optional[str] = None,
-        sortable: bool = True
-    ) -> UIComponent:
-        """Create a data table"""
-        return UIComponent(
-            type=UIComponentType.TABLE,
-            props={
-                "columns": columns,
-                "rows": rows,
-                "title": title,
-                "sortable": sortable
-            }
-        )
-    
-    @staticmethod
-    def expandable_section(
-        title: str,
-        children: List[UIComponent],
-        expanded: bool = False,
-        icon: Optional[str] = None
-    ) -> UIComponent:
-        """Create an expandable section"""
-        return UIComponent(
-            type=UIComponentType.EXPANDABLE,
-            props={
-                "title": title,
-                "expanded": expanded,
-                "icon": icon
-            },
-            children=children
-        )
-    
-    @staticmethod
-    def button_group(buttons: List[Dict[str, Any]]) -> UIComponent:
-        """Create a button group"""
-        return UIComponent(
-            type=UIComponentType.BUTTON_GROUP,
-            props={"buttons": buttons}
-        )
-    
-    @staticmethod
-    def card(
-        title: Optional[str] = None,
-        subtitle: Optional[str] = None,
-        children: Optional[List[UIComponent]] = None,
-        footer: Optional[str] = None,
-        variant: str = "default",
-        collapsible: bool = False
-    ) -> UIComponent:
-        """Create a card container"""
-        return UIComponent(
-            type=UIComponentType.CARD,
-            props={
-                "title": title,
-                "subtitle": subtitle,
-                "footer": footer,
-                "collapsible": collapsible
-            },
-            children=children,
-            style=UIStyle(variant=variant)
-        )
-    
-    @staticmethod
-    def grid(children: List[UIComponent], columns: int = 2, gap: str = "16px") -> UIComponent:
-        """Create a grid layout"""
-        return UIComponent(
-            type=UIComponentType.GRID,
-            props={
-                "columns": columns,
-                "gap": gap
-            },
-            children=children
-        )
-
-
-# ==================== Event Builders ====================
-
-class AGUIEventBuilder:
-    """Builder for creating AG-UI events"""
-    
-    @staticmethod
-    def agent_start(agent_id: str, agent_name: str, message: str) -> AGUIEvent:
-        """Create agent start event"""
-        return AGUIEvent(
-            type=UIEventType.START,
-            source=agent_id,
-            payload={
-                "agentName": agent_name,
-                "message": message,
-                "ui": AGUIBuilder.agent_card(
-                    agent_name=agent_name,
-                    icon=get_agent_icon(agent_id),
-                    phase=AgentPhase.STARTING,
-                    message=message
-                ).model_dump()
-            }
-        )
-    
-    @staticmethod
-    def agent_progress(
-        agent_id: str,
-        agent_name: str,
-        message: str,
-        progress: Optional[int] = None,
-        phase: AgentPhase = AgentPhase.PROCESSING
-    ) -> AGUIEvent:
-        """Create agent progress event"""
-        return AGUIEvent(
-            type=UIEventType.PROGRESS,
-            source=agent_id,
-            payload={
-                "agentName": agent_name,
+                "phase": phase,
                 "message": message,
                 "progress": progress,
-                "phase": phase.value,
-                "ui": AGUIBuilder.agent_card(
-                    agent_name=agent_name,
-                    icon=get_agent_icon(agent_id),
-                    phase=phase,
-                    message=message,
-                    progress=progress
-                ).model_dump()
-            }
-        )
-    
-    @staticmethod
-    def agent_complete(
-        agent_id: str,
-        agent_name: str,
-        message: str,
-        fixes: Optional[List[FixCardSpec]] = None,
-        stats: Optional[Dict[str, Any]] = None,
-        duration: Optional[float] = None
-    ) -> AGUIEvent:
-        """Create agent completion event"""
-        return AGUIEvent(
-            type=UIEventType.COMPLETE,
-            source=agent_id,
-            payload={
-                "agentName": agent_name,
-                "message": message,
-                "fixes": [f.model_dump() if hasattr(f, 'model_dump') else f for f in (fixes or [])],
-                "stats": stats or {},
-                "duration": duration,
-                "ui": AGUIBuilder.agent_card(
-                    agent_name=agent_name,
-                    icon=get_agent_icon(agent_id),
-                    phase=AgentPhase.COMPLETE,
-                    message=message,
-                    fixes=fixes,
-                    stats=stats
-                ).model_dump()
-            }
-        )
-    
-    @staticmethod
-    def code_update(
-        agent_id: str,
-        code: str,
-        fixes: List[FixCardSpec],
-        original_code: Optional[str] = None
-    ) -> AGUIEvent:
-        """Create code update event with diff"""
-        ui_components = []
-        
-        # Add fix cards
-        for fix in fixes:
-            ui_components.append(AGUIBuilder.fix_card(
-                agent=fix.agent if hasattr(fix, 'agent') else agent_id,
-                description=fix.description if hasattr(fix, 'description') else str(fix),
-                severity=fix.severity if hasattr(fix, 'severity') else Severity.MEDIUM,
-                before=fix.before if hasattr(fix, 'before') else None,
-                after=fix.after if hasattr(fix, 'after') else None,
-                line=fix.line if hasattr(fix, 'line') else None
-            ).model_dump())
-        
-        # Add diff if we have original
-        if original_code and code != original_code:
-            ui_components.append(AGUIBuilder.code_diff(
-                before=original_code,
-                after=code,
-                title="Code Changes"
-            ).model_dump())
-        
-        return AGUIEvent(
-            type=UIEventType.UPDATE,
-            source=agent_id,
-            payload={
-                "code": code,
-                "fixCount": len(fixes),
-                "ui": ui_components
-            }
-        )
-    
-    @staticmethod
-    def render_ui(components: List[UIComponent], surface_id: str = "main") -> AGUIEvent:
-        """Create render event with UI components"""
-        return AGUIEvent(
-            type=UIEventType.RENDER,
-            source="system",
-            target=surface_id,
-            payload={
-                "components": [c.model_dump() if hasattr(c, 'model_dump') else c for c in components]
-            }
-        )
-    
-    @staticmethod
-    def workflow_update(steps: List[WorkflowStepSpec]) -> AGUIEvent:
-        """Create workflow timeline update"""
-        return AGUIEvent(
-            type=UIEventType.UPDATE,
-            source="system",
-            target="workflow",
-            payload={
-                "ui": AGUIBuilder.workflow_timeline(steps).model_dump()
-            }
-        )
-    
-    @staticmethod
-    def stream_chunk(content: str, chunk_type: str = "code") -> AGUIEvent:
-        """Create a stream chunk event"""
-        return AGUIEvent(
-            type=UIEventType.STREAM_CHUNK,
-            source="code_generator",
-            payload={
-                "content": content,
-                "chunkType": chunk_type
-            }
-        )
-    
-    @staticmethod
-    def stream_end(total_content: str, stats: Optional[Dict[str, Any]] = None) -> AGUIEvent:
-        """Create stream end event"""
-        return AGUIEvent(
-            type=UIEventType.STREAM_END,
-            source="code_generator",
-            payload={
-                "totalContent": total_content,
                 "stats": stats or {}
             }
         )
-    
-    @staticmethod
-    def error(source: str, message: str, details: Optional[Dict[str, Any]] = None) -> AGUIEvent:
-        """Create an error event"""
-        return AGUIEvent(
-            type=UIEventType.ERROR,
-            source=source,
-            payload={
-                "message": message,
-                "details": details or {},
-                "ui": AGUIBuilder.alert(
-                    message=message,
-                    severity=Severity.HIGH,
-                    title="Error"
-                ).model_dump()
+
+    def code_update(self, code: str, source: str,
+                    fixes: list = None, fix_count: int = 0) -> CustomEvent:
+        """Emit code update with fixes as CUSTOM event."""
+        return self.custom(
+            name="code_update",
+            value={
+                "code": code,
+                "source": source,
+                "fixCount": fix_count or (len(fixes) if fixes else 0),
+                "fixes": [f.model_dump() for f in (fixes or [])]
+            }
+        )
+
+    def agent_result(self, agent_name: str, icon: str, data: Dict[str, Any],
+                     fixes: list = None, stats: Dict[str, Any] = None) -> CustomEvent:
+        """Emit agent result as CUSTOM event."""
+        return self.custom(
+            name="agent_result",
+            value={
+                "agentName": agent_name,
+                "icon": icon,
+                "data": data,
+                "fixes": [f.model_dump() for f in (fixes or [])],
+                "stats": stats or {}
+            }
+        )
+
+    # --- Multi-File Project Events ---
+
+    def project_plan(self, plan: Dict[str, Any]) -> CustomEvent:
+        """Emit project plan (file tree) as CUSTOM event."""
+        return self.custom(
+            name="project_plan",
+            value=plan
+        )
+
+    def file_started(self, file_path: str, language: str,
+                     purpose: str = "", file_index: int = 0,
+                     total_files: int = 0) -> CustomEvent:
+        """Emit file generation started as CUSTOM event."""
+        return self.custom(
+            name="file_started",
+            value={
+                "path": file_path,
+                "language": language,
+                "purpose": purpose,
+                "fileIndex": file_index,
+                "totalFiles": total_files
+            }
+        )
+
+    def file_completed(self, file_path: str, content: str,
+                       lines: int = 0, language: str = "") -> CustomEvent:
+        """Emit file generation completed as CUSTOM event."""
+        return self.custom(
+            name="file_completed",
+            value={
+                "path": file_path,
+                "content": content,
+                "lines": lines,
+                "language": language
+            }
+        )
+
+    def file_updated(self, file_path: str, content: str,
+                     fixes: list = None, fix_count: int = 0) -> CustomEvent:
+        """Emit file updated (after agent fixes) as CUSTOM event."""
+        return self.custom(
+            name="file_updated",
+            value={
+                "path": file_path,
+                "content": content,
+                "fixCount": fix_count or (len(fixes) if fixes else 0),
+                "fixes": [f.model_dump() for f in (fixes or [])]
             }
         )
 
 
-def get_agent_icon(agent_id: str) -> str:
-    """Get icon for agent"""
-    icons = {
-        "code_generator": "⚡",
-        "validator": "✓",
-        "testing": "🧪",
-        "security": "🛡️"
-    }
-    return icons.get(agent_id.lower(), "🤖")
+# ==================== Helper Functions ====================
 
-
-def create_fix_spec(
-    agent: str,
-    description: str,
-    severity: str = "medium",
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    line: Optional[int] = None,
-    category: Optional[str] = None
-) -> FixCardSpec:
-    """Helper to create a FixCardSpec from agent output"""
-    severity_map = {
-        "critical": Severity.CRITICAL,
-        "high": Severity.HIGH,
-        "medium": Severity.MEDIUM,
-        "low": Severity.LOW,
-        "info": Severity.INFO
-    }
-    return FixCardSpec(
+def create_fix_spec(agent, description, severity="medium",
+                    before=None, after=None, line=None, category=None):
+    """Helper to create a FixSpec from agent output."""
+    return FixSpec(
         agent=agent,
         description=description,
-        severity=severity_map.get(severity.lower(), Severity.MEDIUM),
+        severity=severity.lower() if severity else "medium",
         before=before,
         after=after,
         line=line,
@@ -711,13 +459,17 @@ def create_fix_spec(
     )
 
 
-# ==================== SSE Helpers ====================
+def get_agent_icon(agent_id: str) -> str:
+    """Get icon for an agent by ID."""
+    icons = {
+        "code_generator": "",
+        "validator": "",
+        "testing": "",
+        "security": ""
+    }
+    return icons.get(agent_id.lower(), "")
 
-def serialize_event(event: AGUIEvent) -> str:
-    """Serialize an event for SSE transmission"""
-    return event.to_sse()
 
-
-def serialize_component(component: UIComponent) -> str:
-    """Serialize a component to JSON"""
-    return component.model_dump_json()
+def new_id() -> str:
+    """Generate a short unique ID."""
+    return str(uuid.uuid4())[:8]

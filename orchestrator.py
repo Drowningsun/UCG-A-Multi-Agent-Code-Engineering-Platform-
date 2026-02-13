@@ -10,6 +10,7 @@ from agents import (
     ValidationAgent,
     TestingAgent,
     SecurityAgent,
+    ProjectPlannerAgent,
     AGENT_INFO
 )
 
@@ -21,6 +22,7 @@ class Orchestrator:
         self.api_key = api_key
         
         # Initialize all agents
+        self.planner = ProjectPlannerAgent(api_key)
         self.code_generator = CodeGeneratorAgent(api_key)
         self.validator = ValidationAgent(api_key)
         self.tester = TestingAgent(api_key)
@@ -250,6 +252,12 @@ class Orchestrator:
         return {
             "agents": [
                 {
+                    "id": "planner",
+                    "name": self.planner.name,
+                    "description": self.planner.description,
+                    "icon": "📋"
+                },
+                {
                     "id": "code_generator",
                     "name": self.code_generator.name,
                     "description": self.code_generator.description,
@@ -276,3 +284,29 @@ class Orchestrator:
             ],
             "workflow": self.get_workflow_info()
         }
+
+    # ==================== Multi-File Generation ====================
+
+    def classify_prompt(self, prompt):
+        """Classify whether a prompt needs single or multi-file output."""
+        return self.planner.classify(prompt)
+
+    def plan_project(self, prompt):
+        """Generate a multi-file project plan."""
+        return self.planner.plan_project(prompt)
+
+    def generate_file_stream(self, prompt, file_info, project_plan, generated_files=None):
+        """Stream generation of a single file within a multi-file project."""
+        return self.planner.generate_file_stream(prompt, file_info, project_plan, generated_files)
+
+    def validate_file(self, code, file_path=""):
+        """Validate a single file's code."""
+        return self.validator.validate(code)
+
+    def test_file(self, code, file_path=""):
+        """Run testing on a single file's code."""
+        return self.tester.test(code)
+
+    def secure_file(self, code, file_path=""):
+        """Run security scan on a single file's code."""
+        return self.security.scan(code)

@@ -1,7 +1,7 @@
 // Generative UI Chat Interface V2 - Clean Split-Panel Design
 // Professional-grade, spacious layout with AG-UI Protocol
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
@@ -16,7 +16,12 @@ import {
   Badge
 } from '../components/GenUIComponents';
 import { useAGUIState, parseSSEData } from '../components/AGUIRenderer';
+import { EventType } from '../agui/client';
+import FileTree from '../components/FileTree';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import '../components/GenUIComponents.css';
+import '../components/FileTree.css';
 import './GenUIChatPageV2.css';
 
 const API_BASE = 'http://localhost:5000/api';
@@ -68,6 +73,15 @@ const GenUIChatPageV2 = () => {
 
   // Completion celebration
   const [showCompletion, setShowCompletion] = useState(false);
+
+  // Multi-file state
+  const [projectMode, setProjectMode] = useState('single'); // 'single' | 'multi'
+  const [projectPlan, setProjectPlan] = useState(null);
+  const [projectFiles, setProjectFiles] = useState(new Map()); // path -> {content, language, purpose, lines, status}
+  const [activeFile, setActiveFile] = useState(null); // currently selected file path
+  const [openTabs, setOpenTabs] = useState([]); // array of open file paths
+  const [streamingFile, setStreamingFile] = useState(null); // file currently being streamed
+  const [completedFiles, setCompletedFiles] = useState(new Set());
 
   // Refs
   const messagesEndRef = useRef(null);
@@ -150,7 +164,26 @@ const GenUIChatPageV2 = () => {
   const buildResultFromMessage = (msg) => {
     const workflowData = msg.workflow_data || {};
     const restoredStats = workflowData.stats || {};
+    const mode = workflowData.mode || 'single';
+
+    if (mode === 'multi') {
+      return {
+        mode: 'multi',
+        project_name: workflowData.project_name || 'project',
+        project_files: workflowData.project_files || [],
+        all_fixes: workflowData.all_fixes || [],
+        total_fixes: workflowData.total_fixes || 0,
+        stats: {
+          totalDuration: restoredStats.totalDuration || null,
+          totalLines: restoredStats.totalLines || 0,
+          totalFiles: restoredStats.totalFiles || 0,
+          totalFixes: restoredStats.totalFixes || 0
+        }
+      };
+    }
+
     return {
+      mode: 'single',
       code: msg.code_output,
       original_code: workflowData.original_code,
       all_fixes: workflowData.all_fixes || [],
@@ -178,6 +211,33 @@ const GenUIChatPageV2 = () => {
     setShowOriginal(false);
     setShowRightPanel(true);
     setRightPanelTab('code');
+
+    // Restore mode-specific state
+    if (builtResult.mode === 'multi') {
+      setProjectMode('multi');
+      const restoredFiles = new Map();
+      const tabs = [];
+      for (const f of (builtResult.project_files || [])) {
+        restoredFiles.set(f.path, {
+          content: f.content,
+          language: f.language || 'text',
+          purpose: f.purpose || '',
+          lines: f.lines || f.content?.split('\n').length || 0,
+          status: 'complete'
+        });
+        tabs.push(f.path);
+      }
+      setProjectFiles(restoredFiles);
+      setOpenTabs(tabs);
+      setActiveFile(tabs[0] || null);
+      setCompletedFiles(new Set(tabs));
+      setStreamingFile(null);
+    } else {
+      setProjectMode('single');
+      setProjectFiles(new Map());
+      setOpenTabs([]);
+      setActiveFile(null);
+    }
 
     // Restore agent messages for this specific message
     if (msg.workflow_data?.agent_messages) {
@@ -289,11 +349,23 @@ const GenUIChatPageV2 = () => {
     setRightPanelTab('code');
     resetAGUI();
 
+    // Reset multi-file state
+    setProjectMode('single');
+    setProjectPlan(null);
+    setProjectFiles(new Map());
+    setActiveFile(null);
+    setOpenTabs([]);
+    setStreamingFile(null);
+    setCompletedFiles(new Set());
+
     try {
       // Include context_code if we have previously generated code
+      // Only send context_code for single-file follow-ups, not new multi-file requests
+      const previousCode = (result?.mode === 'single' && result?.code) ? result.code : null;
       const requestBody = {
         prompt,
-        context_code: result?.code || null  // Send previous code for follow-up prompts
+        api_key: localStorage.getItem('groq_api_key') || null,
+        context_code: previousCode
       };
 
       const response = await fetch(`${API_BASE}/generate/stream`, {
@@ -310,175 +382,433 @@ const GenUIChatPageV2 = () => {
       let finalAllFixes = [];
       let localAgentMessages = []; // Track agent messages locally for saving
       const startTime = Date.now(); // Track start time for duration calculation
+      let currentStreamingFile = null; // Track which file is being streamed (multi-file)
+      let multiFileContents = {}; // {path: content} for multi-file mode
+      let localProjectPlan = null; // Store plan locally for saving
+
+      // Extracted event handler to avoid no-loop-func warning
+      const handleSSEEvent = (data) => {
+        processEvent(data);
+
+        // ==== AG-UI Protocol Event Handler ====
+        switch (data.type) {
+          case EventType.RUN_STARTED:
+            break;
+
+          case EventType.STEP_STARTED:
+            setActiveAgent(data.stepName);
+            break;
+
+          case EventType.STEP_FINISHED:
+            break;
+
+          case EventType.TEXT_MESSAGE_START:
+            break;
+
+          case EventType.TEXT_MESSAGE_CONTENT:
+            if (currentStreamingFile) {
+              const prevContent = multiFileContents[currentStreamingFile] || '';
+              multiFileContents[currentStreamingFile] = prevContent + (data.delta || '');
+              const fileKey = currentStreamingFile;
+              const newContent = multiFileContents[fileKey];
+              setProjectFiles(prev => {
+                const next = new Map(prev);
+                const existing = next.get(fileKey) || {};
+                next.set(fileKey, {
+                  ...existing,
+                  content: newContent,
+                  lines: newContent.split('\n').length
+                });
+                return next;
+              });
+              setStreamingCode(newContent);
+              setStreamingStats({
+                lines: newContent.split('\n').length,
+                chars: newContent.length
+              });
+            } else {
+              fullCode += data.delta || '';
+              setStreamingCode(fullCode);
+              setStreamingStats({
+                lines: fullCode.split('\n').length,
+                chars: fullCode.length
+              });
+            }
+            break;
+
+          case EventType.TEXT_MESSAGE_END:
+            break;
+
+          case EventType.TOOL_CALL_START:
+            break;
+
+          case EventType.TOOL_CALL_ARGS:
+            break;
+
+          case EventType.TOOL_CALL_END:
+            break;
+
+          case EventType.TOOL_CALL_RESULT:
+            break;
+
+            case EventType.STATE_SNAPSHOT:
+              // Full state snapshot — update based on mode
+              if (data.snapshot?.mode === 'multi') {
+                setProjectMode('multi');
+              }
+              if (data.snapshot?.code) {
+                fullCode = data.snapshot.code;
+                setStreamingCode(fullCode);
+              }
+              break;
+
+            case EventType.STATE_DELTA:
+              // Incremental state update (JSON Patch)
+              break;
+
+            case EventType.CUSTOM:
+              // Domain-specific events via CUSTOM
+              switch (data.name) {
+                case 'project_plan': {
+                  // Multi-file: project plan received
+                  const plan = data.value?.plan || data.value;
+                  localProjectPlan = plan;
+                  setProjectMode('multi');
+                  setProjectPlan(plan);
+
+                  // Initialize file entries from plan
+                  const initialFiles = new Map();
+                  const initialTabs = [];
+                  for (const f of (plan.files || [])) {
+                    initialFiles.set(f.path, {
+                      content: '',
+                      language: f.language || 'text',
+                      purpose: f.purpose || '',
+                      lines: 0,
+                      status: 'pending'
+                    });
+                    initialTabs.push(f.path);
+                  }
+                  setProjectFiles(initialFiles);
+                  setOpenTabs(initialTabs);
+                  if (initialTabs.length > 0) setActiveFile(initialTabs[0]);
+
+                  const planMsg = {
+                    agent: 'Project Planner',
+                    message: `📋 Planned ${plan.files?.length || 0} files for "${plan.project_name || 'project'}"`,
+                    type: 'result',
+                    time: new Date().toLocaleTimeString()
+                  };
+                  localAgentMessages.push(planMsg);
+                  setAgentMessages(prev => [...prev, planMsg]);
+                  break;
+                }
+
+                case 'file_started': {
+                  // Multi-file: file generation starting
+                  const filePath = data.value?.path || data.value?.filePath;
+                  currentStreamingFile = filePath;
+                  multiFileContents[filePath] = '';
+                  setStreamingFile(filePath);
+                  setActiveFile(filePath);
+                  setStreamingCode('');
+
+                  // Update file status
+                  setProjectFiles(prev => {
+                    const next = new Map(prev);
+                    const existing = next.get(filePath) || {};
+                    next.set(filePath, {
+                      ...existing,
+                      language: data.value?.language || existing.language || 'text',
+                      purpose: data.value?.purpose || existing.purpose || '',
+                      status: 'streaming'
+                    });
+                    return next;
+                  });
+                  break;
+                }
+
+                case 'file_completed': {
+                  // Multi-file: file generation complete
+                  const filePath = data.value?.path || data.value?.filePath;
+                  const content = data.value?.content || multiFileContents[filePath] || '';
+                  multiFileContents[filePath] = content;
+                  currentStreamingFile = null;
+                  setStreamingFile(null);
+
+                  setProjectFiles(prev => {
+                    const next = new Map(prev);
+                    const existing = next.get(filePath) || {};
+                    next.set(filePath, {
+                      ...existing,
+                      content: content,
+                      lines: data.value?.lines || content.split('\n').length,
+                      language: data.value?.language || existing.language || 'text',
+                      status: 'complete'
+                    });
+                    return next;
+                  });
+                  setCompletedFiles(prev => new Set([...prev, filePath]));
+                  break;
+                }
+
+                case 'file_updated': {
+                  // Multi-file: file updated by validation/testing/security agent
+                  const filePath = data.value?.path || data.value?.filePath;
+                  const content = data.value?.content || '';
+                  if (filePath && content) {
+                    multiFileContents[filePath] = content;
+                    setProjectFiles(prev => {
+                      const next = new Map(prev);
+                      const existing = next.get(filePath) || {};
+                      next.set(filePath, {
+                        ...existing,
+                        content: content,
+                        lines: content.split('\n').length,
+                        status: 'updated'
+                      });
+                      return next;
+                    });
+                  }
+                  break;
+                }
+
+                case 'agent_activity': {
+                  const agentName = data.value?.agentName || 'Agent';
+                  setActiveAgent(agentName);
+                  const activityMsg = {
+                    agent: agentName,
+                    message: data.value?.message || `${agentName} processing...`,
+                    progress: data.value?.progress,
+                    type: data.value?.phase === 'complete' ? 'result' : (data.value?.phase === 'starting' ? 'start' : 'progress'),
+                    time: new Date().toLocaleTimeString()
+                  };
+                  localAgentMessages.push(activityMsg);
+                  setAgentMessages(prev => [...prev, activityMsg]);
+                  break;
+                }
+
+                case 'code_update': {
+                  // Capture original code before first fix
+                  if (!originalCode && fullCode) {
+                    originalCode = fullCode;
+                  }
+                  fullCode = data.value?.code || fullCode;
+                  setStreamingCode(fullCode);
+                  if (data.value?.fixes) {
+                    finalAllFixes.push({
+                      agent: data.value?.source,
+                      fixes: data.value.fixes
+                    });
+                  }
+                  const codeUpdateMsg = {
+                    agent: data.value?.source,
+                    message: `Applied ${data.value?.fixCount || 0} fixes`,
+                    fixes: data.value?.fixes,
+                    type: 'code_update',
+                    time: new Date().toLocaleTimeString()
+                  };
+                  localAgentMessages.push(codeUpdateMsg);
+                  setAgentMessages(prev => [...prev, codeUpdateMsg]);
+                  break;
+                }
+
+                case 'agent_result': {
+                  const agentKey = data.value?.agentName?.toLowerCase() || 'agent';
+                  agentResults[agentKey] = data.value?.data;
+
+                  if (data.value?.fixes && data.value.fixes.length > 0) {
+                    finalAllFixes.push({
+                      agent: data.value?.agentName,
+                      fixes: data.value.fixes
+                    });
+                  }
+
+                  const resultMsg = {
+                    agent: data.value?.agentName,
+                    message: data.value?.stats?.fixesApplied
+                      ? `Completed with ${data.value.stats.fixesApplied} fixes`
+                      : `Completed`,
+                    stats: data.value?.stats,
+                    fixes: data.value?.fixes,
+                    type: 'result',
+                    time: new Date().toLocaleTimeString()
+                  };
+                  localAgentMessages.push(resultMsg);
+                  setAgentMessages(prev => [...prev, resultMsg]);
+                  break;
+                }
+
+                case 'workflow_update': {
+                  // Workflow timeline update (handled by useAGUIState hook)
+                  break;
+                }
+
+                default:
+                  break;
+              }
+              break;
+
+            case EventType.RUN_FINISHED: {
+              // Run complete — extract final result from AG-UI result payload
+              const res = data.result || {};
+              const mode = res.mode || 'single';
+              const mergedFixes = res.all_fixes?.length > 0 ? res.all_fixes : finalAllFixes;
+              const duration = res.stats?.totalDuration || ((Date.now() - startTime) / 1000).toFixed(1);
+
+              if (mode === 'multi') {
+                // Multi-file result
+                const finalResult = {
+                  mode: 'multi',
+                  project_name: res.project_name || localProjectPlan?.project_name || 'project',
+                  project_files: res.project_files || [],
+                  prompt: res.prompt,
+                  all_fixes: mergedFixes,
+                  total_fixes: res.total_fixes || mergedFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0),
+                  workflow: res.workflow,
+                  stats: { ...res.stats, totalDuration: duration }
+                };
+                setResult(finalResult);
+
+                // Update project files state from final data
+                setProjectFiles(prev => {
+                  const next = new Map(prev);
+                  for (const pf of (res.project_files || [])) {
+                    next.set(pf.path, {
+                      content: pf.content,
+                      language: pf.language || 'text',
+                      purpose: pf.purpose || '',
+                      lines: pf.lines || pf.content?.split('\n').length || 0,
+                      original_content: pf.original_content,
+                      was_fixed: pf.was_fixed,
+                      status: 'complete'
+                    });
+                  }
+                  return next;
+                });
+              } else {
+                // Single-file result (existing behavior)
+                const finalOriginalCode = originalCode || res.original_code || null;
+                const finalResult = {
+                  mode: 'single',
+                  code: res.code || fullCode,
+                  original_code: finalOriginalCode,
+                  prompt: res.prompt,
+                  validation: agentResults.validator || res.validation,
+                  tests: agentResults.testing || agentResults['testing agent'] || res.tests,
+                  security: agentResults.security || agentResults['security agent'] || res.security,
+                  all_fixes: mergedFixes,
+                  code_was_fixed: res.code_was_fixed || mergedFixes.length > 0,
+                  total_fixes: res.total_fixes || mergedFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0),
+                  workflow: res.workflow,
+                  stats: { ...res.stats, totalDuration: duration }
+                };
+                setResult(finalResult);
+              }
+
+              setActiveAgent(null);
+              break;
+            }
+
+            case EventType.RUN_ERROR: {
+              setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: `❌ ${data.message || 'Error generating code. Please try again.'}`
+              }]);
+              break;
+            }
+
+            default:
+              break;
+          }
+        };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        const sseLines = chunk.split('\n');
 
-        for (const line of lines) {
+        for (const line of sseLines) {
           if (!line.startsWith('data: ')) continue;
-
           const data = parseSSEData(line);
           if (!data) continue;
-
-          processEvent(data);
-
-          switch (data.type) {
-            case 'start':
-              setActiveAgent(data.source || data.payload?.agentName);
-              const startMsg = {
-                agent: data.source || data.payload?.agentName,
-                message: data.payload?.message || `Starting ${data.payload?.agentName}...`,
-                type: 'start',
-                time: new Date().toLocaleTimeString()
-              };
-              localAgentMessages.push(startMsg);
-              setAgentMessages(prev => [...prev, startMsg]);
-              break;
-
-            case 'stream_chunk':
-              fullCode += data.payload?.content || '';
-              setStreamingCode(fullCode);
-              setStreamingStats({
-                lines: data.payload?.totalLines || fullCode.split('\n').length,
-                chars: data.payload?.totalChars || fullCode.length
-              });
-              break;
-
-            case 'progress':
-              const progressMsg = {
-                agent: data.source || data.payload?.agentName,
-                message: data.payload?.message,
-                progress: data.payload?.progress,
-                type: 'progress',
-                time: new Date().toLocaleTimeString()
-              };
-              localAgentMessages.push(progressMsg);
-              setAgentMessages(prev => [...prev, progressMsg]);
-              break;
-
-            case 'code_update':
-              // Capture original code before first fix is applied
-              if (!originalCode && fullCode) {
-                originalCode = fullCode;
-              }
-              fullCode = data.payload?.code || fullCode;
-              setStreamingCode(fullCode);
-              if (data.payload?.fixes) {
-                finalAllFixes.push({
-                  agent: data.source || data.payload?.ui?.agent,
-                  fixes: data.payload?.fixes
-                });
-              }
-              const codeUpdateMsg = {
-                agent: data.source,
-                message: `Applied ${data.payload?.fixCount || 0} fixes`,
-                fixes: data.payload?.fixes,
-                type: 'code_update',
-                time: new Date().toLocaleTimeString()
-              };
-              localAgentMessages.push(codeUpdateMsg);
-              setAgentMessages(prev => [...prev, codeUpdateMsg]);
-              break;
-
-            case 'agent_result':
-              const agentKey = data.payload?.agentName?.toLowerCase() || data.source;
-              agentResults[agentKey] = data.payload?.data;
-
-              // Capture fixes from agent_result if present
-              if (data.payload?.fixes && data.payload.fixes.length > 0) {
-                finalAllFixes.push({
-                  agent: data.payload?.agentName || data.source,
-                  fixes: data.payload.fixes
-                });
-              }
-
-              const resultMsg = {
-                agent: data.payload?.agentName || data.source,
-                message: data.payload?.stats?.fixesApplied
-                  ? `Completed with ${data.payload.stats.fixesApplied} fixes`
-                  : `Completed`,
-                stats: data.payload?.stats,
-                fixes: data.payload?.fixes,
-                type: 'result',
-                time: new Date().toLocaleTimeString()
-              };
-              localAgentMessages.push(resultMsg);
-              setAgentMessages(prev => [...prev, resultMsg]);
-              break;
-
-            case 'complete':
-              // Merge backend all_fixes with locally collected fixes
-              const backendFixes = data.payload?.all_fixes || [];
-              const mergedFixes = backendFixes.length > 0 ? backendFixes : finalAllFixes;
-
-              // Calculate duration
-              const duration = data.payload?.stats?.totalDuration || ((Date.now() - startTime) / 1000).toFixed(1);
-
-              // Use our captured originalCode, fallback to backend's original_code
-              const finalOriginalCode = originalCode || data.payload?.original_code || null;
-
-              const finalResult = {
-                code: data.payload?.code || fullCode,
-                original_code: finalOriginalCode,
-                prompt: data.payload?.prompt,
-                validation: agentResults.validator || data.payload?.validation,
-                tests: agentResults.testing || agentResults['testing agent'] || data.payload?.tests,
-                security: agentResults.security || agentResults['security agent'] || data.payload?.security,
-                all_fixes: mergedFixes,
-                code_was_fixed: data.payload?.code_was_fixed || mergedFixes.length > 0,
-                total_fixes: data.payload?.total_fixes || mergedFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0),
-                workflow: data.payload?.workflow,
-                stats: {
-                  ...data.payload?.stats,
-                  totalDuration: duration
-                }
-              };
-              setResult(finalResult);
-              setActiveAgent(null);
-              break;
-
-            default:
-              break;
-          }
+          handleSSEEvent(data);
         }
       }
 
       const totalFixCount = finalAllFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
       const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
-      const assistantContent = `Generated ${fullCode.split('\n').length} lines of code${totalFixCount > 0 ? ` with ${totalFixCount} auto-fixes` : ''} in ${totalDuration}s`;
+
+      // Determine mode based on what happened during streaming
+      const isMultiFile = localProjectPlan !== null;
+      const multiFileCount = Object.keys(multiFileContents).length;
+      const totalMultiLines = Object.values(multiFileContents).reduce((sum, c) => sum + c.split('\n').length, 0);
+
+      const assistantContent = isMultiFile
+        ? `Generated ${multiFileCount} files (${totalMultiLines} lines)${totalFixCount > 0 ? ` with ${totalFixCount} auto-fixes` : ''} in ${totalDuration}s`
+        : `Generated ${fullCode.split('\n').length} lines of code${totalFixCount > 0 ? ` with ${totalFixCount} auto-fixes` : ''} in ${totalDuration}s`;
 
       // Build final result for state
-      // Use captured originalCode (code before any fixes were applied)
       const finalOriginalCodeForSave = originalCode || result?.original_code || null;
-      const savedResult = {
-        code: fullCode,
-        original_code: finalOriginalCodeForSave,
-        all_fixes: finalAllFixes,
-        code_was_fixed: totalFixCount > 0 || (originalCode && originalCode !== fullCode),
-        total_fixes: totalFixCount,
-        validation: agentResults.validator,
-        tests: agentResults.testing || agentResults['testing agent'],
-        security: agentResults.security || agentResults['security agent'],
-        stats: {
-          totalDuration: totalDuration,
-          totalLines: fullCode.split('\n').length,
-          totalFixes: totalFixCount
-        }
-      };
 
-      // Update the result state with final values including original_code
+      let savedResult;
+      if (isMultiFile) {
+        // Multi-file saved result
+        const projFiles = (localProjectPlan?.files || []).map(f => ({
+          path: f.path,
+          content: multiFileContents[f.path] || '',
+          language: f.language || 'text',
+          purpose: f.purpose || '',
+          lines: (multiFileContents[f.path] || '').split('\n').length
+        }));
+
+        savedResult = {
+          mode: 'multi',
+          project_name: localProjectPlan?.project_name || 'project',
+          project_files: projFiles,
+          all_fixes: finalAllFixes,
+          total_fixes: totalFixCount,
+          stats: {
+            totalDuration: totalDuration,
+            totalLines: totalMultiLines,
+            totalFiles: multiFileCount,
+            totalFixes: totalFixCount
+          }
+        };
+      } else {
+        // Single-file saved result
+        savedResult = {
+          mode: 'single',
+          code: fullCode,
+          original_code: finalOriginalCodeForSave,
+          all_fixes: finalAllFixes,
+          code_was_fixed: totalFixCount > 0 || (originalCode && originalCode !== fullCode),
+          total_fixes: totalFixCount,
+          validation: agentResults.validator,
+          tests: agentResults.testing || agentResults['testing agent'],
+          security: agentResults.security || agentResults['security agent'],
+          stats: {
+            totalDuration: totalDuration,
+            totalLines: fullCode.split('\n').length,
+            totalFixes: totalFixCount
+          }
+        };
+      }
+
+      // Update the result state with final values
       setResult(savedResult);
 
       const newAssistantMsg = {
         role: 'assistant',
         content: assistantContent,
-        code_output: fullCode,
+        code_output: isMultiFile ? JSON.stringify({ mode: 'multi', project_files: savedResult.project_files }) : fullCode,
         workflow_data: {
-          original_code: savedResult.original_code,
+          mode: isMultiFile ? 'multi' : 'single',
+          project_name: isMultiFile ? savedResult.project_name : undefined,
+          project_files: isMultiFile ? savedResult.project_files : undefined,
+          original_code: isMultiFile ? undefined : savedResult.original_code,
           all_fixes: finalAllFixes,
           code_was_fixed: savedResult.code_was_fixed,
           total_fixes: totalFixCount,
@@ -499,19 +829,18 @@ const GenUIChatPageV2 = () => {
       if (sessionId && token) {
         try {
           // Build stats object for saving
-          const statsToSave = {
-            totalDuration: totalDuration,
-            totalLines: fullCode.split('\n').length,
-            totalFixes: totalFixCount
-          };
+          const statsToSave = savedResult.stats;
 
           // Save message with full workflow_data including fixes
           await authAxios.post(`/sessions/${sessionId}/messages`, {
             role: 'assistant',
             content: assistantContent,
-            code_output: fullCode,
+            code_output: newAssistantMsg.code_output,
             workflow_data: {
-              original_code: savedResult.original_code,
+              mode: isMultiFile ? 'multi' : 'single',
+              project_name: isMultiFile ? savedResult.project_name : undefined,
+              project_files: isMultiFile ? savedResult.project_files : undefined,
+              original_code: isMultiFile ? undefined : savedResult.original_code,
               all_fixes: finalAllFixes,
               code_was_fixed: savedResult.code_was_fixed,
               total_fixes: totalFixCount,
@@ -519,7 +848,7 @@ const GenUIChatPageV2 = () => {
               tests: savedResult.tests,
               security: savedResult.security,
               stats: statsToSave,
-              agent_messages: localAgentMessages.slice(-20) // Save last 20 agent messages
+              agent_messages: localAgentMessages.slice(-20)
             }
           });
         } catch (error) {
@@ -605,6 +934,95 @@ const GenUIChatPageV2 = () => {
       window.prompt('Copy this code (Ctrl+C):', codeToCopy.substring(0, 500) + (codeToCopy.length > 500 ? '...' : ''));
     }
     setTimeout(() => setCopyStatus(''), 2000);
+  };
+
+  // ZIP download for multi-file projects
+  const downloadZip = async () => {
+    const files = result?.project_files || Array.from(projectFiles.entries()).map(([path, f]) => ({
+      path, content: f.content
+    }));
+
+    if (!files.length) return;
+
+    const zip = new JSZip();
+    const projectName = result?.project_name || projectPlan?.project_name || 'project';
+
+    for (const file of files) {
+      zip.file(file.path, file.content || '');
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    saveAs(blob, `${projectName}.zip`);
+  };
+
+  // Copy active file content (multi-file mode)
+  const copyActiveFileCode = async () => {
+    const fileData = projectFiles.get(activeFile);
+    const code = fileData?.content || '';
+    if (!code) return;
+
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopyStatus('✓ Copied!');
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = code;
+      textArea.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopyStatus('✓ Copied!');
+    }
+    setTimeout(() => setCopyStatus(''), 2000);
+  };
+
+  // File selection handler for FileTree
+  const handleFileSelect = useCallback((path) => {
+    setActiveFile(path);
+    if (!openTabs.includes(path)) {
+      setOpenTabs(prev => [...prev, path]);
+    }
+    // Update streaming code to show this file
+    const fileData = projectFiles.get(path);
+    if (fileData?.content) {
+      setStreamingCode(fileData.content);
+    }
+  }, [openTabs, projectFiles]);
+
+  // Close tab
+  const closeTab = useCallback((path, e) => {
+    e?.stopPropagation();
+    setOpenTabs(prev => {
+      const next = prev.filter(p => p !== path);
+      if (activeFile === path && next.length > 0) {
+        setActiveFile(next[next.length - 1]);
+      }
+      return next;
+    });
+  }, [activeFile]);
+
+  // File list for FileTree component (derived from projectFiles state)
+  const fileTreeData = useMemo(() => {
+    return Array.from(projectFiles.entries()).map(([path, data]) => ({
+      path,
+      language: data.language || 'text',
+      purpose: data.purpose || '',
+      lines: data.lines || 0,
+      content: data.content || ''
+    }));
+  }, [projectFiles]);
+
+  // Language detection from file extension
+  const getLanguageFromPath = (filePath) => {
+    const ext = filePath?.split('.').pop()?.toLowerCase();
+    const langMap = {
+      js: 'javascript', jsx: 'jsx', ts: 'typescript', tsx: 'tsx',
+      py: 'python', html: 'html', css: 'css', scss: 'scss',
+      json: 'json', md: 'markdown', yml: 'yaml', yaml: 'yaml',
+      sql: 'sql', sh: 'bash', toml: 'toml', xml: 'xml', svg: 'xml'
+    };
+    return langMap[ext] || 'text';
   };
 
   const getAgentIcon = (agentId) => {
@@ -817,8 +1235,8 @@ const GenUIChatPageV2 = () => {
 
       {/* Main Chat Area */}
       <main
-        className={`genui-v2-main ${showRightPanel && (streamingCode || result) ? 'with-panel' : ''}`}
-        style={showRightPanel && (streamingCode || result) ? { maxWidth: `calc(100vw - 72px - ${panelWidth}px)` } : {}}
+        className={`genui-v2-main ${showRightPanel && (streamingCode || result || projectFiles.size > 0) ? 'with-panel' : ''}`}
+        style={showRightPanel && (streamingCode || result || projectFiles.size > 0) ? { maxWidth: `calc(100vw - 72px - ${panelWidth}px)` } : {}}
       >
         {/* Header */}
         <header className="main-header">
@@ -826,7 +1244,7 @@ const GenUIChatPageV2 = () => {
             <h1>{sessionTitle}</h1>
             <Badge variant="primary" size="sm">GenUI</Badge>
           </div>
-          {(streamingCode || result) && (
+          {(streamingCode || result || projectFiles.size > 0) && (
             <button
               className="panel-toggle"
               onClick={() => setShowRightPanel(!showRightPanel)}
@@ -844,19 +1262,32 @@ const GenUIChatPageV2 = () => {
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="workflow-steps">
-              {['Code Gen', 'Validate', 'Test', 'Secure'].map((step, i) => {
-                const agents = ['code_generator', 'validator', 'testing', 'security'];
-                const isActive = activeAgent?.toLowerCase().includes(agents[i].split('_')[0]);
+              {(projectMode === 'multi'
+                ? [
+                    { label: 'Plan', agent: 'planning', icon: '📋' },
+                    { label: 'Generate', agent: 'code_generator', icon: '⚡' },
+                    { label: 'Validate', agent: 'validator', icon: '✓' },
+                    { label: 'Test', agent: 'testing', icon: '🧪' },
+                    { label: 'Secure', agent: 'security', icon: '🛡️' }
+                  ]
+                : [
+                    { label: 'Code Gen', agent: 'code_generator', icon: '⚡' },
+                    { label: 'Validate', agent: 'validator', icon: '✓' },
+                    { label: 'Test', agent: 'testing', icon: '🧪' },
+                    { label: 'Secure', agent: 'security', icon: '🛡️' }
+                  ]
+              ).map((step, i, arr) => {
+                const isActive = activeAgent?.toLowerCase().includes(step.agent.split('_')[0]);
                 const isDone = agentMessages.some(m =>
-                  m.agent?.toLowerCase().includes(agents[i].split('_')[0]) && m.type === 'result'
+                  m.agent?.toLowerCase().includes(step.agent.split('_')[0]) && m.type === 'result'
                 );
                 return (
-                  <React.Fragment key={step}>
+                  <React.Fragment key={step.label}>
                     <div className={`workflow-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
-                      <span className="step-icon">{isDone ? '✓' : ['⚡', '✓', '🧪', '🛡️'][i]}</span>
-                      <span className="step-name">{step}</span>
+                      <span className="step-icon">{isDone ? '✓' : step.icon}</span>
+                      <span className="step-name">{step.label}</span>
                     </div>
-                    {i < 3 && (
+                    {i < arr.length - 1 && (
                       <div className={`workflow-connector ${isDone ? 'filled' : ''} ${isActive ? 'active' : ''}`} />
                     )}
                   </React.Fragment>
@@ -886,13 +1317,13 @@ const GenUIChatPageV2 = () => {
                       <span>🔐</span>
                       <span>Auth Class</span>
                     </button>
-                    <button onClick={() => setPrompt('Build a rate limiter decorator for API endpoints')}>
-                      <span>⏱️</span>
-                      <span>Rate Limiter</span>
+                    <button onClick={() => setPrompt('Build a Flask REST API with user authentication, database models, and rate limiting')}>
+                      <span>📦</span>
+                      <span>Flask API Project</span>
                     </button>
-                    <button onClick={() => setPrompt('Create a database connection pool manager')}>
-                      <span>🗄️</span>
-                      <span>DB Pool</span>
+                    <button onClick={() => setPrompt('Create a React todo app with components, styling, and local storage')}>
+                      <span>⚛️</span>
+                      <span>React Todo App</span>
                     </button>
                   </div>
                 </div>
@@ -1042,13 +1473,13 @@ const GenUIChatPageV2 = () => {
               )}
             </button>
           </form>
-          <p className="input-hint">Powered by Llama 3.3 via Groq • 4 AI Agents</p>
+          <p className="input-hint">Powered by Llama 3.3 via Groq • Smart single/multi-file detection • 5 AI Agents</p>
         </div>
       </main>
 
       {/* Right Panel - Results */}
       <AnimatePresence>
-        {showRightPanel && (streamingCode || result) && (
+        {showRightPanel && (streamingCode || result || projectFiles.size > 0) && (
           <>
             {/* Resize Handle */}
             <div
@@ -1099,52 +1530,173 @@ const GenUIChatPageV2 = () => {
               <div className="panel-content">
                 {/* Code Tab */}
                 {rightPanelTab === 'code' && (
-                  <div className="code-panel">
-                    <div className="code-header">
-                      <div className="code-stats">
-                        <span>{streamingStats.lines || result?.code?.split('\n').length || 0} lines</span>
-                        {result?.code_was_fixed && (
-                          <Badge variant="success" size="sm">✓ Fixed</Badge>
+                  <>
+                    {projectMode === 'multi' ? (
+                      /* ===== MULTI-FILE CODE PANEL ===== */
+                      <div className="multi-file-panel">
+                        {/* Project plan banner */}
+                        {projectPlan && (
+                          <div className="project-plan-banner">
+                            <span className="plan-icon">📦</span>
+                            <div className="plan-info">
+                              <div className="plan-title">{projectPlan.project_name || 'Project'}</div>
+                              <div className="plan-desc">{projectPlan.description || ''}</div>
+                            </div>
+                            <div className="plan-stats">
+                              <div className="plan-stat">
+                                <div className="plan-stat-value">{projectPlan.files?.length || 0}</div>
+                                <div className="plan-stat-label">Files</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="multi-file-split">
+                          {/* File tree sidebar */}
+                          <div className="multi-file-tree-pane">
+                            <FileTree
+                              files={fileTreeData}
+                              activeFile={activeFile}
+                              onFileSelect={handleFileSelect}
+                              streamingFile={streamingFile}
+                              completedFiles={completedFiles}
+                              projectName={projectPlan?.project_name || result?.project_name || 'Project'}
+                            />
+                          </div>
+
+                          {/* Editor pane */}
+                          <div className="multi-file-editor-pane">
+                            {/* File tabs */}
+                            <div className="file-tabs">
+                              {openTabs.map(tabPath => {
+                                const fileName = tabPath.split('/').pop();
+                                return (
+                                  <button
+                                    key={tabPath}
+                                    className={`file-tab ${activeFile === tabPath ? 'active' : ''}`}
+                                    onClick={() => handleFileSelect(tabPath)}
+                                  >
+                                    <span className="tab-name">{fileName}</span>
+                                    {openTabs.length > 1 && (
+                                      <span className="tab-close" onClick={(e) => closeTab(tabPath, e)}>×</span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* File header with actions */}
+                            <div className="code-header">
+                              <div className="code-stats">
+                                <span>{activeFile || 'No file selected'}</span>
+                                {activeFile && projectFiles.get(activeFile) && (
+                                  <Badge variant="primary" size="sm">
+                                    {projectFiles.get(activeFile)?.lines || 0} lines
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="code-actions">
+                                <button onClick={copyActiveFileCode}>
+                                  {copyStatus || 'Copy'}
+                                </button>
+                                {!loading && (result?.project_files?.length > 0 || projectFiles.size > 0) && (
+                                  <button className="download-zip-btn" onClick={downloadZip}>
+                                    📥 Download ZIP
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Code viewer */}
+                            <div className={`multi-file-code-view ${loading && streamingFile === activeFile ? 'streaming' : ''}`}>
+                              <CodeBlock
+                                code={projectFiles.get(activeFile)?.content || streamingCode || '// Select a file...'}
+                                language={getLanguageFromPath(activeFile)}
+                                lineNumbers={true}
+                                maxHeight="calc(100vh - 320px)"
+                              />
+                              {loading && streamingFile === activeFile && <span className="streaming-cursor" />}
+                            </div>
+
+                            {/* File progress bar */}
+                            {loading && (
+                              <div className="file-progress-bar">
+                                <span className="progress-text">
+                                  {streamingFile
+                                    ? `⚡ Generating ${streamingFile}...`
+                                    : `✓ ${completedFiles.size}/${projectPlan?.files?.length || 0} files`
+                                  }
+                                </span>
+                                <div className="progress-track">
+                                  <div
+                                    className="progress-fill"
+                                    style={{ width: `${projectPlan?.files?.length ? (completedFiles.size / projectPlan.files.length) * 100 : 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {showCompletion && (
+                          <div className="completion-badge">
+                            <svg className="checkmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M5 13l4 4L19 7" />
+                            </svg>
+                            Project Generated
+                          </div>
                         )}
                       </div>
-                      <div className="code-actions">
-                        {result?.original_code && (
-                          <button onClick={() => setShowOriginal(!showOriginal)}>
-                            {showOriginal ? 'Show Fixed' : 'Show Original'}
-                          </button>
+                    ) : (
+                      /* ===== SINGLE-FILE CODE PANEL ===== */
+                      <div className="code-panel">
+                        <div className="code-header">
+                          <div className="code-stats">
+                            <span>{streamingStats.lines || result?.code?.split('\n').length || 0} lines</span>
+                            {result?.code_was_fixed && (
+                              <Badge variant="success" size="sm">✓ Fixed</Badge>
+                            )}
+                          </div>
+                          <div className="code-actions">
+                            {result?.original_code && (
+                              <button onClick={() => setShowOriginal(!showOriginal)}>
+                                {showOriginal ? 'Show Fixed' : 'Show Original'}
+                              </button>
+                            )}
+                            <button onClick={copyCode}>
+                              {copyStatus || 'Copy'}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className={`code-view ${loading ? 'streaming' : ''} ${showCompletion ? 'completion-flash' : ''}`}>
+                          <CodeBlock
+                            code={showOriginal ? result?.original_code : (result?.code || streamingCode)}
+                            language="python"
+                            lineNumbers={true}
+                            maxHeight="calc(100vh - 250px)"
+                          />
+                          {loading && <span className="streaming-cursor" />}
+                        </div>
+
+                        {loading && (
+                          <div className="streaming-bar">
+                            <span className="pulse">●</span>
+                            <span>Streaming... {streamingStats.lines} lines</span>
+                          </div>
                         )}
-                        <button onClick={copyCode}>
-                          {copyStatus || 'Copy'}
-                        </button>
-                      </div>
-                    </div>
 
-                    <div className={`code-view ${loading ? 'streaming' : ''} ${showCompletion ? 'completion-flash' : ''}`}>
-                      <CodeBlock
-                        code={showOriginal ? result?.original_code : (result?.code || streamingCode)}
-                        language="python"
-                        lineNumbers={true}
-                        maxHeight="calc(100vh - 250px)"
-                      />
-                      {loading && <span className="streaming-cursor" />}
-                    </div>
-
-                    {loading && (
-                      <div className="streaming-bar">
-                        <span className="pulse">●</span>
-                        <span>Streaming... {streamingStats.lines} lines</span>
+                        {showCompletion && (
+                          <div className="completion-badge">
+                            <svg className="checkmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M5 13l4 4L19 7" />
+                            </svg>
+                            Generation Complete
+                          </div>
+                        )}
                       </div>
                     )}
-
-                    {showCompletion && (
-                      <div className="completion-badge">
-                        <svg className="checkmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M5 13l4 4L19 7" />
-                        </svg>
-                        Generation Complete
-                      </div>
-                    )}
-                  </div>
+                  </>
                 )}
 
                 {/* Agents Tab */}
@@ -1154,9 +1706,20 @@ const GenUIChatPageV2 = () => {
                     {result && (
                       <div className="stats-row">
                         <div className="stat-item">
-                          <span className="stat-value">{result.code?.split('\n').length || 0}</span>
+                          <span className="stat-value">
+                            {result.mode === 'multi'
+                              ? result.stats?.totalLines || 0
+                              : result.code?.split('\n').length || 0
+                            }
+                          </span>
                           <span className="stat-label">Lines</span>
                         </div>
+                        {result.mode === 'multi' && (
+                          <div className="stat-item">
+                            <span className="stat-value">{result.stats?.totalFiles || 0}</span>
+                            <span className="stat-label">Files</span>
+                          </div>
+                        )}
                         <div className="stat-item">
                           <span className="stat-value">{totalFixes}</span>
                           <span className="stat-label">Fixes</span>
