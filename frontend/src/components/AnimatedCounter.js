@@ -14,16 +14,25 @@ const AnimatedCounter = ({
 }) => {
     const [displayValue, setDisplayValue] = useState(0);
     const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, amount: 0.5 });
-    const hasAnimated = useRef(false);
+    const isInView = useInView(ref, { once: false, amount: 0.3 });
+    const prevValue = useRef(0);
 
     useEffect(() => {
-        if (!isInView || hasAnimated.current) return;
-        hasAnimated.current = true;
+        if (!isInView) return;
 
         const numericValue = typeof value === 'number' ? value : parseInt(value, 10);
-        if (isNaN(numericValue) || numericValue === 0) {
+        if (isNaN(numericValue)) {
             setDisplayValue(value);
+            return;
+        }
+
+        // Skip animation if value hasn't changed
+        if (numericValue === prevValue.current) return;
+        const startFrom = prevValue.current;
+        prevValue.current = numericValue;
+
+        if (numericValue === 0) {
+            setDisplayValue(0);
             return;
         }
 
@@ -40,7 +49,7 @@ const AnimatedCounter = ({
             const elapsed = now - startTime;
             const progress = Math.min(elapsed / duration, 1);
             const easedProgress = easeOutExpo(progress);
-            const currentValue = Math.round(easedProgress * numericValue);
+            const currentValue = Math.round(startFrom + easedProgress * (numericValue - startFrom));
 
             setDisplayValue(currentValue);
 

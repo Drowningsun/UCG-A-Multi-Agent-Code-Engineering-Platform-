@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
 import UsageLimitModal from '../components/UsageLimitModal';
@@ -11,7 +13,7 @@ const API_BASE = 'http://localhost:5000/api';
 // Helper function to format markdown reports to HTML
 const formatMarkdownReport = (markdown) => {
   if (!markdown) return '';
-  
+
   let html = markdown
     // Escape HTML first
     .replace(/</g, '&lt;')
@@ -32,10 +34,10 @@ const formatMarkdownReport = (markdown) => {
     // Line breaks
     .replace(/\n\n/g, '</p><p>')
     .replace(/\n/g, '<br/>');
-  
+
   // Wrap list items
   html = html.replace(/(<li>.*<\/li>)+/g, '<ul>$&</ul>');
-  
+
   return `<div class="markdown-report"><p>${html}</p></div>`;
 };
 
@@ -54,7 +56,7 @@ const generateAgentReport = (agentType, data) => {
   };
 
   let html = '<div class="agent-report-generated">';
-  
+
   // Header
   if (agentType === 'validation') {
     html += '<h3>✅ Validation Report</h3>';
@@ -68,7 +70,7 @@ const generateAgentReport = (agentType, data) => {
   }
 
   html += '<div class="fixes-detail-list">';
-  
+
   fixes.forEach((fix, index) => {
     const isObject = typeof fix === 'object';
     const description = isObject ? fix.description : fix;
@@ -79,24 +81,24 @@ const generateAgentReport = (agentType, data) => {
 
     html += '<div class="fix-detail-item">';
     html += `<h4>Fix ${index + 1}: ${description}</h4>`;
-    
+
     if (severity) {
       html += `<span class="severity-badge severity-${severity.toLowerCase()}">${severityEmoji[severity] || '🔵'} ${severity}</span>`;
     }
     if (line) {
       html += `<span class="line-badge">Line ${line}</span>`;
     }
-    
+
     if (before && after) {
       html += '<div class="before-after">';
       html += '<div class="code-before"><strong>Before:</strong><pre><code>' + escapeHtml(before.replace(/\\n/g, '\n')) + '</code></pre></div>';
       html += '<div class="code-after"><strong>After:</strong><pre><code>' + escapeHtml(after.replace(/\\n/g, '\n')) + '</code></pre></div>';
       html += '</div>';
     }
-    
+
     html += '</div>';
   });
-  
+
   html += '</div></div>';
   return html;
 };
@@ -105,6 +107,38 @@ const generateAgentReport = (agentType, data) => {
 const escapeHtml = (text) => {
   if (!text) return '';
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+};
+
+// Language detection from prompt text
+const detectLanguage = (prompt) => {
+  if (!prompt) return 'python';
+  const p = prompt.toLowerCase();
+  const langMap = [
+    [/\b(python|flask|django|fastapi|pandas|numpy)\b/, 'python'],
+    [/\b(javascript|node\.?js|express|react|vue|angular|nextjs|next\.js)\b/, 'javascript'],
+    [/\b(typescript|tsx?)\b/, 'typescript'],
+    [/\b(java\b(?!script))/, 'java'],
+    [/\b(c\+\+|cpp)\b/, 'cpp'],
+    [/\b(c#|csharp|dotnet|\.net)\b/, 'csharp'],
+    [/\b(go|golang)\b/, 'go'],
+    [/\b(rust|cargo)\b/, 'rust'],
+    [/\b(ruby|rails)\b/, 'ruby'],
+    [/\b(php|laravel)\b/, 'php'],
+    [/\b(swift|swiftui)\b/, 'swift'],
+    [/\b(kotlin|android)\b/, 'kotlin'],
+    [/\b(sql|mysql|postgres|sqlite|database|query)\b/, 'sql'],
+    [/\b(html|webpage|web page)\b/, 'html'],
+    [/\b(css|stylesheet|tailwind)\b/, 'css'],
+    [/\b(bash|shell|script|terminal|cli)\b/, 'bash'],
+    [/\b(scala)\b/, 'scala'],
+    [/\b(perl)\b/, 'perl'],
+    [/\b(lua)\b/, 'lua'],
+    [/\b(dart|flutter)\b/, 'dart'],
+  ];
+  for (const [regex, lang] of langMap) {
+    if (regex.test(p)) return lang;
+  }
+  return 'python';
 };
 
 const ChatPage = () => {
@@ -132,6 +166,12 @@ const ChatPage = () => {
   const messagesEndRef = useRef(null);
   const codeEndRef = useRef(null);
   const sessionCreatedRef = useRef(false);  // Prevent duplicate session creation
+
+  // Auto-detect language from the most recent user message
+  const detectedLang = useMemo(() => {
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    return detectLanguage(lastUserMsg?.content || prompt);
+  }, [messages, prompt]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -216,11 +256,11 @@ const ChatPage = () => {
       navigate('/chat');
       return;
     }
-    
+
     try {
       const response = await authAxios.post('/sessions');
       const newSessionId = response.data.session_id;
-      
+
       // Reset all state for new chat
       setSessionId(newSessionId);
       setSessionTitle('New Chat');
@@ -237,7 +277,7 @@ const ChatPage = () => {
       setAgentFixes([]);
       setOriginalCode('');
       sessionCreatedRef.current = true;
-      
+
       // Navigate to the new session
       navigate(`/chat/${newSessionId}`);
     } catch (error) {
@@ -257,7 +297,7 @@ const ChatPage = () => {
 
     const userMessage = { role: 'user', content: prompt };
     setMessages(prev => [...prev, userMessage]);
-    
+
     // Save user message to MongoDB
     if (sessionId && token) {
       try {
@@ -273,7 +313,7 @@ const ChatPage = () => {
         console.error('Error saving user message:', error);
       }
     }
-    
+
     setLoading(true);
     setIsStreaming(true);
     setStreamingCode('');
@@ -309,7 +349,7 @@ const ChatPage = () => {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              
+
               if (data.type === 'start') {
                 setCurrentAgent(data.agent);
                 setStreamingMessage(data.message || `${data.agent} is working...`);
@@ -369,13 +409,13 @@ const ChatPage = () => {
 
       const totalFixCount = allFixes.reduce((sum, f) => sum + f.fixes.length, 0);
       const assistantContent = `✅ Code generated successfully! (${fullCode.split('\n').length} lines)${totalFixCount > 0 ? `\n\n🔧 **${totalFixCount} AI fixes applied** by agents` : ''}\n\n**Agent Results:**\n• Code Generator: Done\n• Validator: ${agentResults.validator?.fixes_applied?.length || 0} fixes\n• Testing: ${agentResults.testing?.fixes_applied?.length || 0} fixes\n• Security: ${agentResults.security?.fixes_applied?.length || 0} fixes`;
-      
+
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: assistantContent,
         hasResult: true
       }]);
-      
+
       // Save assistant message to MongoDB
       if (sessionId && token) {
         try {
@@ -394,7 +434,7 @@ const ChatPage = () => {
           console.error('Error saving assistant message:', error);
         }
       }
-      
+
       // Increment guest usage after successful generation
       if (!isAuthenticated) {
         incrementGuestUsage();
@@ -447,7 +487,7 @@ const ChatPage = () => {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              
+
               if (data.type === 'start') {
                 setCurrentAgent(data.agent);
               } else if (data.type === 'chunk') {
@@ -466,7 +506,7 @@ const ChatPage = () => {
                 setEditedCode(data.code);
                 setCurrentAgent(null);
               }
-            } catch (e) {}
+            } catch (e) { }
           }
         }
       }
@@ -496,7 +536,7 @@ const ChatPage = () => {
         original_code: result.code,
         updates: [{ old: result.code, new: editedCode }]
       });
-      
+
       setResult(prev => ({
         ...prev,
         code: response.data.updated_code,
@@ -504,7 +544,7 @@ const ChatPage = () => {
         tests: response.data.tests,
         security: response.data.security
       }));
-      
+
       setEditMode(false);
     } catch (error) {
       console.error('Error:', error);
@@ -548,7 +588,7 @@ const ChatPage = () => {
             <span>📊</span> Dashboard
           </Link>
         </nav>
-        
+
         <div className="sidebar-footer">
           <div className="session-info">
             <span className="session-title-label">{sessionTitle}</span>
@@ -568,20 +608,20 @@ const ChatPage = () => {
         {/* Edit Actions Bar - Only show when there's a result */}
         {result && (
           <div className="edit-actions-bar">
-            <button 
+            <button
               className={`btn ${showPromptEdit ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setShowPromptEdit(!showPromptEdit)}
             >
               ✏️ Edit Prompt
             </button>
-            <button 
+            <button
               className={`btn ${editMode ? 'btn-success' : 'btn-secondary'}`}
               onClick={() => editMode ? handleCodeEdit() : setEditMode(true)}
             >
               {editMode ? '✓ Save Changes' : '📝 Edit Code'}
             </button>
             {editMode && (
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => {
                   setEditMode(false);
@@ -658,7 +698,7 @@ const ChatPage = () => {
                     {streamingMessage}
                     <span className="typing-cursor">|</span>
                   </div>
-                  
+
                   {/* Real-time Agent Fixes Display */}
                   {agentFixes.length > 0 && (
                     <div className="realtime-fixes">
@@ -676,14 +716,22 @@ const ChatPage = () => {
                       ))}
                     </div>
                   )}
-                  
+
                   {streamingCode && (
                     <div className="streaming-preview">
                       <div className="preview-header">
                         <span>📝 Code Preview</span>
                         <span className="line-count">{streamingCode.split('\n').length} lines</span>
                       </div>
-                      <pre><code>{streamingCode.slice(-800)}</code></pre>
+                      <SyntaxHighlighter
+                        language={detectedLang}
+                        style={vscDarkPlus}
+                        showLineNumbers={false}
+                        customStyle={{ margin: 0, borderRadius: '0 0 8px 8px', fontSize: '13px', maxHeight: '300px' }}
+                        wrapLongLines={true}
+                      >
+                        {streamingCode.slice(-800)}
+                      </SyntaxHighlighter>
                     </div>
                   )}
                 </div>
@@ -724,7 +772,7 @@ const ChatPage = () => {
             <div className="code-section">
               <div className="section-header">
                 <h3>
-                  {result?.code_was_fixed ? '✨ Fixed Code' : 'Generated Code'} 
+                  {result?.code_was_fixed ? '✨ Fixed Code' : 'Generated Code'}
                   {loading && <span className="streaming-indicator">● Streaming</span>}
                   {result?.code_was_fixed && (
                     <span className="fixes-badge">🔧 {result.total_fixes} fixes applied</span>
@@ -732,7 +780,7 @@ const ChatPage = () => {
                 </h3>
                 <div className="code-actions">
                   {result?.original_code && (
-                    <button 
+                    <button
                       className="btn btn-sm btn-secondary"
                       onClick={() => setShowOriginal(!showOriginal)}
                     >
@@ -749,9 +797,18 @@ const ChatPage = () => {
                   onChange={(e) => setEditedCode(e.target.value)}
                 />
               ) : (
-                <pre className="code-block">
-                  <code>{showOriginal ? result?.original_code : (result?.code || streamingCode)}<span ref={codeEndRef} className="cursor">|</span></code>
-                </pre>
+                <div className="code-block" ref={codeEndRef}>
+                  <SyntaxHighlighter
+                    language={detectedLang}
+                    style={vscDarkPlus}
+                    showLineNumbers={true}
+                    wrapLongLines={true}
+                    customStyle={{ margin: 0, borderRadius: '8px', fontSize: '13px', background: '#1e1e2e' }}
+                    lineNumberStyle={{ color: '#555', minWidth: '2.5em', paddingRight: '1em' }}
+                  >
+                    {showOriginal ? (result?.original_code || '') : (result?.code || streamingCode || '')}
+                  </SyntaxHighlighter>
+                </div>
               )}
             </div>
 
@@ -778,7 +835,7 @@ const ChatPage = () => {
             {result && (
               <div className="results-section">
                 <h3>🔄 LangGraph AI Agent Pipeline Results</h3>
-                
+
                 {/* Validation Agent */}
                 <div className="agent-result-card">
                   <div className="agent-header">
@@ -796,11 +853,11 @@ const ChatPage = () => {
                     </div>
                     {getStatusBadge(result.validation?.status)}
                   </div>
-                  
+
                   {/* Agent Report - Generated from structured data */}
                   {result.validation?.fixes_applied?.length > 0 ? (
                     <div className="agent-report">
-                      <div className="report-content" dangerouslySetInnerHTML={{ 
+                      <div className="report-content" dangerouslySetInnerHTML={{
                         __html: generateAgentReport('validation', result.validation)
                       }} />
                     </div>
@@ -809,7 +866,7 @@ const ChatPage = () => {
                       <p>{result.validation?.message || (result.validation?.ai_powered ? '✅ Code passed validation - no fixes needed' : '⚠️ Basic validation (API key required for AI fixes)')}</p>
                     </div>
                   )}
-                  
+
                   {result.validation?.stats && (
                     <div className="agent-stats">
                       <span>📊 {result.validation.stats.functions} functions</span>
@@ -836,11 +893,11 @@ const ChatPage = () => {
                     </div>
                     {getStatusBadge(result.tests?.status)}
                   </div>
-                  
+
                   {/* Agent Report - Generated from structured data */}
                   {result.tests?.fixes_applied?.length > 0 ? (
                     <div className="agent-report">
-                      <div className="report-content" dangerouslySetInnerHTML={{ 
+                      <div className="report-content" dangerouslySetInnerHTML={{
                         __html: generateAgentReport('testing', result.tests)
                       }} />
                     </div>
@@ -849,7 +906,7 @@ const ChatPage = () => {
                       <p>{result.tests?.message || (result.tests?.ai_powered ? '✅ Error handling is adequate - no fixes needed' : '⚠️ Basic test (API key required for AI fixes)')}</p>
                     </div>
                   )}
-                  
+
                   {result.tests?.testability_score && (
                     <div className="agent-stats">
                       <span>📊 Testability Score: {result.tests.testability_score}/100</span>
@@ -874,11 +931,11 @@ const ChatPage = () => {
                     </div>
                     {getStatusBadge(result.security?.status)}
                   </div>
-                  
+
                   {/* Agent Report - Generated from structured data */}
                   {result.security?.fixes_applied?.length > 0 ? (
                     <div className="agent-report">
-                      <div className="report-content" dangerouslySetInnerHTML={{ 
+                      <div className="report-content" dangerouslySetInnerHTML={{
                         __html: generateAgentReport('security', result.security)
                       }} />
                     </div>
@@ -887,7 +944,7 @@ const ChatPage = () => {
                       <p>{result.security?.message || (result.security?.ai_powered ? '✅ Code is secure - no vulnerabilities found' : '⚠️ Basic scan only - API key required for AI auto-fix')}</p>
                     </div>
                   )}
-                  
+
                   {result.security?.risk_level && (
                     <div className="security-info">
                       <span className={`risk-badge risk-${result.security.risk_level.toLowerCase()}`}>
@@ -940,7 +997,7 @@ const ChatPage = () => {
           </button>
         </form>
       </main>
-      
+
       {/* Usage Limit Modal for guests */}
       <UsageLimitModal
         isOpen={showUsageLimitModal}

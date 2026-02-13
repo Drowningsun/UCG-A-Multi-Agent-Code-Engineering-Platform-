@@ -25,91 +25,101 @@ const GenUIChatPageV2 = () => {
   const { sessionId: urlSessionId } = useParams();
   const navigate = useNavigate();
   const { authAxios, token, isAuthenticated, hasReachedGuestLimit, incrementGuestUsage } = useAuth();
-  
+
   // Usage limit modal state
   const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
-  
+
   // Session state
   const [sessionId, setSessionId] = useState(urlSessionId || null);
   const [sessionTitle, setSessionTitle] = useState('New Chat');
   const [messages, setMessages] = useState([]);
-  
+
   // Input state
   const [prompt, setPrompt] = useState('');
-  
+
   // Streaming & result state
   const [loading, setLoading] = useState(false);
   const [streamingCode, setStreamingCode] = useState('');
   const [streamingStats, setStreamingStats] = useState({ lines: 0, chars: 0 });
-  
+
   // AG-UI State
   const { processEvent, reset: resetAGUI } = useAGUIState();
-  
+
   // Result state
   const [result, setResult] = useState(null);
   const [showOriginal, setShowOriginal] = useState(false);
-  
+
   // Edit message state
   const [editingMessageIndex, setEditingMessageIndex] = useState(null);
   const [editingContent, setEditingContent] = useState('');
   
+  // Selected message index for viewing previous results
+  const [selectedMessageIndex, setSelectedMessageIndex] = useState(null);
+
   // Panel state
   const [rightPanelTab, setRightPanelTab] = useState('code'); // 'code', 'agents', 'fixes'
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [panelWidth, setPanelWidth] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
-  
+
   // Active agent for display
   const [activeAgent, setActiveAgent] = useState(null);
   const [agentMessages, setAgentMessages] = useState([]);
-  
+
   // Completion celebration
   const [showCompletion, setShowCompletion] = useState(false);
-  
+
   // Refs
   const messagesEndRef = useRef(null);
   const sessionCreatedRef = useRef(false);
   const resizeRef = useRef(null);
-  
+
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
-  
-  // Panel resize handlers
+
+  // Panel resize handlers - using refs to avoid stale closures
+  const panelWidthRef = useRef(panelWidth);
+
   const startResize = useCallback((e) => {
+    e.preventDefault();
     setIsResizing(true);
     resizeRef.current = e.clientX;
-  }, []);
-  
-  const doResize = useCallback((e) => {
-    if (!isResizing) return;
-    const diff = resizeRef.current - e.clientX;
-    const newWidth = Math.min(Math.max(panelWidth + diff, 350), 900);
-    setPanelWidth(newWidth);
-    resizeRef.current = e.clientX;
-  }, [isResizing, panelWidth]);
-  
-  const stopResize = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-  
-  // Add/remove resize event listeners
+    panelWidthRef.current = panelWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelWidth]);
+
   useEffect(() => {
-    if (isResizing) {
-      window.addEventListener('mousemove', doResize);
-      window.addEventListener('mouseup', stopResize);
-    }
-    return () => {
-      window.removeEventListener('mousemove', doResize);
-      window.removeEventListener('mouseup', stopResize);
+    if (!isResizing) return;
+
+    const handleMouseMove = (e) => {
+      const diff = resizeRef.current - e.clientX;
+      const newWidth = Math.min(Math.max(panelWidthRef.current + diff, 350), 900);
+      panelWidthRef.current = newWidth;
+      resizeRef.current = e.clientX;
+      setPanelWidth(newWidth);
     };
-  }, [isResizing, doResize, stopResize]);
-  
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
-  
+
   // Handle URL session ID changes
   useEffect(() => {
     if (urlSessionId && isAuthenticated) {
@@ -127,7 +137,7 @@ const GenUIChatPageV2 = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSessionId, isAuthenticated]);
-  
+
   // Load session data
   useEffect(() => {
     if (sessionId && token) {
@@ -135,7 +145,46 @@ const GenUIChatPageV2 = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, token]);
-  
+
+  // Helper to build a result object from a message's stored data
+  const buildResultFromMessage = (msg) => {
+    const workflowData = msg.workflow_data || {};
+    const restoredStats = workflowData.stats || {};
+    return {
+      code: msg.code_output,
+      original_code: workflowData.original_code,
+      all_fixes: workflowData.all_fixes || [],
+      code_was_fixed: workflowData.code_was_fixed,
+      total_fixes: workflowData.total_fixes || 0,
+      validation: workflowData.validation,
+      tests: workflowData.tests,
+      security: workflowData.security,
+      stats: {
+        totalDuration: restoredStats.totalDuration || restoredStats.total_duration || null,
+        totalLines: restoredStats.totalLines || restoredStats.total_lines || 0,
+        totalFixes: restoredStats.totalFixes || restoredStats.total_fixes || 0
+      }
+    };
+  };
+
+  // Handle clicking an assistant message to view its result in the right panel
+  const selectMessage = useCallback((index) => {
+    const msg = messages[index];
+    if (!msg || msg.role !== 'assistant' || !msg.hasResult) return;
+
+    setSelectedMessageIndex(index);
+    const builtResult = buildResultFromMessage(msg);
+    setResult(builtResult);
+    setShowOriginal(false);
+    setShowRightPanel(true);
+    setRightPanelTab('code');
+
+    // Restore agent messages for this specific message
+    if (msg.workflow_data?.agent_messages) {
+      setAgentMessages(msg.workflow_data.agent_messages);
+    }
+  }, [messages]);
+
   const loadSession = async () => {
     if (!sessionId || !token) return;
     try {
@@ -150,34 +199,17 @@ const GenUIChatPageV2 = () => {
           hasResult: !!msg.code_output
         }));
         setMessages(loadedMessages);
-        
-        // Find last assistant message with code and restore full result
-        const lastAssistantMsg = [...response.data.messages].reverse().find(m => m.code_output);
-        if (lastAssistantMsg) {
-          const workflowData = lastAssistantMsg.workflow_data || {};
-          
-          // Ensure stats has proper defaults
-          const restoredStats = workflowData.stats || {};
-          
-          setResult({
-            code: lastAssistantMsg.code_output,
-            original_code: workflowData.original_code,
-            all_fixes: workflowData.all_fixes || [],
-            code_was_fixed: workflowData.code_was_fixed,
-            total_fixes: workflowData.total_fixes || 0,
-            validation: workflowData.validation,
-            tests: workflowData.tests,
-            security: workflowData.security,
-            stats: {
-              totalDuration: restoredStats.totalDuration || restoredStats.total_duration || null,
-              totalLines: restoredStats.totalLines || restoredStats.total_lines || 0,
-              totalFixes: restoredStats.totalFixes || restoredStats.total_fixes || 0
-            }
-          });
-          
+
+        // Find last assistant message with code and select it
+        const lastAssistantIndex = loadedMessages.map((m, i) => ({ ...m, i })).filter(m => m.hasResult).pop()?.i;
+        if (lastAssistantIndex !== undefined) {
+          const lastMsg = loadedMessages[lastAssistantIndex];
+          setSelectedMessageIndex(lastAssistantIndex);
+          setResult(buildResultFromMessage(lastMsg));
+
           // Restore agent messages if available
-          if (workflowData.agent_messages) {
-            setAgentMessages(workflowData.agent_messages);
+          if (lastMsg.workflow_data?.agent_messages) {
+            setAgentMessages(lastMsg.workflow_data.agent_messages);
           }
         }
       }
@@ -185,7 +217,7 @@ const GenUIChatPageV2 = () => {
       console.error('Error loading session:', error);
     }
   };
-  
+
   const createSession = async () => {
     // Only create sessions for authenticated users
     if (!isAuthenticated) {
@@ -201,7 +233,7 @@ const GenUIChatPageV2 = () => {
       navigate('/chat');
       return;
     }
-    
+
     try {
       const response = await authAxios.post('/sessions');
       const newSessionId = response.data.session_id;
@@ -218,21 +250,21 @@ const GenUIChatPageV2 = () => {
       console.error('Error creating session:', error);
     }
   };
-  
+
   // Main submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim() || loading) return;
-    
+
     // Check guest usage limit
     if (!isAuthenticated && hasReachedGuestLimit()) {
       setShowUsageLimitModal(true);
       return;
     }
-    
+
     const userMessage = { role: 'user', content: prompt };
     setMessages(prev => [...prev, userMessage]);
-    
+
     if (sessionId && token) {
       try {
         const saveResponse = await authAxios.post(`/sessions/${sessionId}/messages`, {
@@ -246,7 +278,7 @@ const GenUIChatPageV2 = () => {
         console.error('Error saving user message:', error);
       }
     }
-    
+
     setLoading(true);
     setStreamingCode('');
     setStreamingStats({ lines: 0, chars: 0 });
@@ -256,20 +288,20 @@ const GenUIChatPageV2 = () => {
     setShowRightPanel(true);
     setRightPanelTab('code');
     resetAGUI();
-    
+
     try {
       // Include context_code if we have previously generated code
-      const requestBody = { 
-        prompt, 
+      const requestBody = {
+        prompt,
         context_code: result?.code || null  // Send previous code for follow-up prompts
       };
-      
+
       const response = await fetch(`${API_BASE}/generate/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
       });
-      
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullCode = '';
@@ -278,22 +310,22 @@ const GenUIChatPageV2 = () => {
       let finalAllFixes = [];
       let localAgentMessages = []; // Track agent messages locally for saving
       const startTime = Date.now(); // Track start time for duration calculation
-      
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
-        
+
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
-          
+
           const data = parseSSEData(line);
           if (!data) continue;
-          
+
           processEvent(data);
-          
+
           switch (data.type) {
             case 'start':
               setActiveAgent(data.source || data.payload?.agentName);
@@ -306,7 +338,7 @@ const GenUIChatPageV2 = () => {
               localAgentMessages.push(startMsg);
               setAgentMessages(prev => [...prev, startMsg]);
               break;
-              
+
             case 'stream_chunk':
               fullCode += data.payload?.content || '';
               setStreamingCode(fullCode);
@@ -315,7 +347,7 @@ const GenUIChatPageV2 = () => {
                 chars: data.payload?.totalChars || fullCode.length
               });
               break;
-              
+
             case 'progress':
               const progressMsg = {
                 agent: data.source || data.payload?.agentName,
@@ -327,7 +359,7 @@ const GenUIChatPageV2 = () => {
               localAgentMessages.push(progressMsg);
               setAgentMessages(prev => [...prev, progressMsg]);
               break;
-              
+
             case 'code_update':
               // Capture original code before first fix is applied
               if (!originalCode && fullCode) {
@@ -351,11 +383,11 @@ const GenUIChatPageV2 = () => {
               localAgentMessages.push(codeUpdateMsg);
               setAgentMessages(prev => [...prev, codeUpdateMsg]);
               break;
-              
+
             case 'agent_result':
               const agentKey = data.payload?.agentName?.toLowerCase() || data.source;
               agentResults[agentKey] = data.payload?.data;
-              
+
               // Capture fixes from agent_result if present
               if (data.payload?.fixes && data.payload.fixes.length > 0) {
                 finalAllFixes.push({
@@ -363,10 +395,10 @@ const GenUIChatPageV2 = () => {
                   fixes: data.payload.fixes
                 });
               }
-              
+
               const resultMsg = {
                 agent: data.payload?.agentName || data.source,
-                message: data.payload?.stats?.fixesApplied 
+                message: data.payload?.stats?.fixesApplied
                   ? `Completed with ${data.payload.stats.fixesApplied} fixes`
                   : `Completed`,
                 stats: data.payload?.stats,
@@ -377,18 +409,18 @@ const GenUIChatPageV2 = () => {
               localAgentMessages.push(resultMsg);
               setAgentMessages(prev => [...prev, resultMsg]);
               break;
-              
+
             case 'complete':
               // Merge backend all_fixes with locally collected fixes
               const backendFixes = data.payload?.all_fixes || [];
               const mergedFixes = backendFixes.length > 0 ? backendFixes : finalAllFixes;
-              
+
               // Calculate duration
               const duration = data.payload?.stats?.totalDuration || ((Date.now() - startTime) / 1000).toFixed(1);
-              
+
               // Use our captured originalCode, fallback to backend's original_code
               const finalOriginalCode = originalCode || data.payload?.original_code || null;
-              
+
               const finalResult = {
                 code: data.payload?.code || fullCode,
                 original_code: finalOriginalCode,
@@ -408,17 +440,17 @@ const GenUIChatPageV2 = () => {
               setResult(finalResult);
               setActiveAgent(null);
               break;
-              
+
             default:
               break;
           }
         }
       }
-      
+
       const totalFixCount = finalAllFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
       const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
       const assistantContent = `Generated ${fullCode.split('\n').length} lines of code${totalFixCount > 0 ? ` with ${totalFixCount} auto-fixes` : ''} in ${totalDuration}s`;
-      
+
       // Build final result for state
       // Use captured originalCode (code before any fixes were applied)
       const finalOriginalCodeForSave = originalCode || result?.original_code || null;
@@ -437,16 +469,33 @@ const GenUIChatPageV2 = () => {
           totalFixes: totalFixCount
         }
       };
-      
+
       // Update the result state with final values including original_code
       setResult(savedResult);
-      
-      setMessages(prev => [...prev, {
+
+      const newAssistantMsg = {
         role: 'assistant',
         content: assistantContent,
+        code_output: fullCode,
+        workflow_data: {
+          original_code: savedResult.original_code,
+          all_fixes: finalAllFixes,
+          code_was_fixed: savedResult.code_was_fixed,
+          total_fixes: totalFixCount,
+          validation: savedResult.validation,
+          tests: savedResult.tests,
+          security: savedResult.security,
+          stats: savedResult.stats,
+          agent_messages: localAgentMessages.slice(-20)
+        },
         hasResult: true
-      }]);
-      
+      };
+      setMessages(prev => {
+        const updated = [...prev, newAssistantMsg];
+        setSelectedMessageIndex(updated.length - 1);
+        return updated;
+      });
+
       if (sessionId && token) {
         try {
           // Build stats object for saving
@@ -455,7 +504,7 @@ const GenUIChatPageV2 = () => {
             totalLines: fullCode.split('\n').length,
             totalFixes: totalFixCount
           };
-          
+
           // Save message with full workflow_data including fixes
           await authAxios.post(`/sessions/${sessionId}/messages`, {
             role: 'assistant',
@@ -477,12 +526,12 @@ const GenUIChatPageV2 = () => {
           console.error('Error saving assistant message:', error);
         }
       }
-      
+
       // Increment guest usage after successful generation
       if (!isAuthenticated) {
         incrementGuestUsage();
       }
-      
+
     } catch (error) {
       console.error('Error:', error);
       setMessages(prev => [...prev, {
@@ -497,9 +546,9 @@ const GenUIChatPageV2 = () => {
       setTimeout(() => setShowCompletion(false), 3000);
     }
   };
-  
+
   const [copyStatus, setCopyStatus] = useState('');
-  
+
   const copyCode = async () => {
     const codeToCopy = showOriginal ? result?.original_code : (result?.code || streamingCode);
     if (!codeToCopy) {
@@ -507,10 +556,10 @@ const GenUIChatPageV2 = () => {
       setTimeout(() => setCopyStatus(''), 2000);
       return;
     }
-    
+
     // Try multiple methods to copy
     let success = false;
-    
+
     // Method 1: Modern Clipboard API
     if (navigator.clipboard && window.isSecureContext) {
       try {
@@ -520,7 +569,7 @@ const GenUIChatPageV2 = () => {
         console.log('Clipboard API failed:', err);
       }
     }
-    
+
     // Method 2: execCommand fallback
     if (!success) {
       const textArea = document.createElement('textarea');
@@ -538,16 +587,16 @@ const GenUIChatPageV2 = () => {
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      
+
       try {
         success = document.execCommand('copy');
       } catch (err) {
         console.log('execCommand failed:', err);
       }
-      
+
       document.body.removeChild(textArea);
     }
-    
+
     if (success) {
       setCopyStatus('✓ Copied!');
     } else {
@@ -557,7 +606,7 @@ const GenUIChatPageV2 = () => {
     }
     setTimeout(() => setCopyStatus(''), 2000);
   };
-  
+
   const getAgentIcon = (agentId) => {
     const icons = {
       code_generator: '⚡',
@@ -568,61 +617,61 @@ const GenUIChatPageV2 = () => {
     const key = agentId?.toLowerCase().replace(' agent', '').replace(' ', '_');
     return icons[key] || '🤖';
   };
-  
+
   // Handle clicking on a user message to edit
   const handleEditMessage = (index, content) => {
     if (loading) return;
     setEditingMessageIndex(index);
     setEditingContent(content);
   };
-  
+
   // Handle saving edited message and resubmitting
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!editingContent.trim() || loading) return;
-    
+
     // Remove all messages from this point onwards
     setMessages(prev => prev.slice(0, editingMessageIndex));
-    
+
     // Reset results
     setResult(null);
     setStreamingCode('');
     setAgentMessages([]);
-    
+
     // Close edit mode
     setEditingMessageIndex(null);
-    
+
     // Set prompt and trigger submit
     const newPrompt = editingContent;
     setEditingContent('');
     setPrompt(newPrompt);
-    
+
     // Trigger form submission after state updates
     setTimeout(() => {
       document.querySelector('.input-form')?.requestSubmit();
     }, 50);
   };
-  
+
   // Cancel editing
   const handleCancelEdit = () => {
     setEditingMessageIndex(null);
     setEditingContent('');
   };
-  
+
   // Generate a rich description for the code (ChatGPT style)
   const generateDescription = (code, prompt) => {
     if (!code) return null;
-    
+
     const lines = code.split('\n').length;
     const hasClass = code.includes('class ');
     const hasAsync = code.includes('async ');
     const imports = code.match(/^import |^from /gm)?.length || 0;
-    
+
     // Extract function/class names
     const classMatch = code.match(/class\s+(\w+)/g)?.map(c => c.replace('class ', '')) || [];
     const funcMatch = code.match(/def\s+(\w+)/g)?.map(f => f.replace('def ', '')).filter(f => !f.startsWith('_')) || [];
     const publicMethods = funcMatch.filter(f => !f.startsWith('__'));
-    
+
     // Detect patterns
     const hasErrorHandling = code.includes('try:') || code.includes('except');
     const hasLogging = code.includes('logging') || code.includes('logger');
@@ -631,7 +680,7 @@ const GenUIChatPageV2 = () => {
     const hasDecorators = (code.match(/@\w+/g) || []).length > 0;
     const hasDataclass = code.includes('@dataclass');
     const hasValidation = code.includes('raise ') || code.includes('ValueError') || code.includes('assert');
-    
+
     // Build description
     let desc = {
       title: '',
@@ -640,7 +689,7 @@ const GenUIChatPageV2 = () => {
       features: [],
       structure: ''
     };
-    
+
     // Generate title based on what was requested
     const promptLower = prompt?.toLowerCase() || '';
     if (promptLower.includes('auth')) {
@@ -662,7 +711,7 @@ const GenUIChatPageV2 = () => {
     } else {
       desc.title = '✨ Generated Code';
     }
-    
+
     // Generate summary
     if (hasClass && classMatch.length > 0) {
       const className = classMatch[0];
@@ -673,7 +722,7 @@ const GenUIChatPageV2 = () => {
     } else {
       desc.summary = `Here's a Python implementation that ${promptLower.replace(/create|build|write|generate|a |an /gi, '').trim() || 'addresses your requirements'}. The code is structured for maintainability and follows best practices.`;
     }
-    
+
     // Key implementation points
     if (hasClass && classMatch.length > 0) {
       desc.keyPoints.push(`**${classMatch[0]}** - Main class encapsulating the logic`);
@@ -684,7 +733,7 @@ const GenUIChatPageV2 = () => {
         desc.keyPoints.push(`\`${m}()\` - ${m.includes('init') ? 'Initializes the instance' : m.includes('get') ? 'Retrieves data' : m.includes('set') ? 'Updates configuration' : m.includes('validate') ? 'Validates input' : m.includes('create') ? 'Creates new resource' : m.includes('delete') ? 'Removes resource' : m.includes('update') ? 'Updates existing data' : 'Core functionality'}`);
       });
     }
-    
+
     // Features detected
     if (hasAsync) desc.features.push('**Async/await** for non-blocking I/O operations');
     if (hasErrorHandling) desc.features.push('**Exception handling** with proper error recovery');
@@ -697,13 +746,13 @@ const GenUIChatPageV2 = () => {
     if (code.includes('hashlib') || code.includes('bcrypt')) desc.features.push('**Secure hashing** for sensitive data');
     if (code.includes('retry') || code.includes('backoff')) desc.features.push('**Retry logic** with exponential backoff');
     if (code.includes('threading') || code.includes('asyncio')) desc.features.push('**Concurrency** support built-in');
-    
+
     // Structure info
     desc.structure = `${lines} lines • ${imports} import${imports !== 1 ? 's' : ''}${classMatch.length ? ` • ${classMatch.length} class${classMatch.length > 1 ? 'es' : ''}` : ''}${publicMethods.length ? ` • ${publicMethods.length} function${publicMethods.length > 1 ? 's' : ''}` : ''}`;
-    
+
     return desc;
   };
-  
+
   // Normalize agent name to consistent format
   const normalizeAgentName = (name) => {
     if (!name) return 'Unknown';
@@ -711,7 +760,7 @@ const GenUIChatPageV2 = () => {
     // Capitalize first letter
     return lower.charAt(0).toUpperCase() + lower.slice(1);
   };
-  
+
   // Deduplicate and merge fixes by normalized agent name
   const deduplicateFixes = (fixes) => {
     const merged = {};
@@ -721,7 +770,7 @@ const GenUIChatPageV2 = () => {
         merged[normalizedName] = { agent: normalizedName, fixes: [] };
       }
       // Add fixes if not already present (check by description)
-      const existingDescs = new Set(merged[normalizedName].fixes.map(f => 
+      const existingDescs = new Set(merged[normalizedName].fixes.map(f =>
         typeof f === 'object' ? f.description : f
       ));
       for (const fix of (item.fixes || [])) {
@@ -734,11 +783,11 @@ const GenUIChatPageV2 = () => {
     }
     return Object.values(merged).filter(m => m.fixes.length > 0);
   };
-  
+
   // Calculate deduplicated total fixes
   const deduplicatedFixes = result?.all_fixes ? deduplicateFixes(result.all_fixes) : [];
   const totalFixes = deduplicatedFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
-  
+
   return (
     <div className={`genui-v2 ${isResizing ? 'resizing' : ''}`}>
       {/* Minimal Sidebar */}
@@ -749,7 +798,7 @@ const GenUIChatPageV2 = () => {
             <span className="brand-text">Uber Code</span>
           </Link>
         </div>
-        
+
         <nav className="sidebar-actions">
           <button className="action-btn primary" onClick={createSession}>
             <span>+</span>
@@ -760,14 +809,14 @@ const GenUIChatPageV2 = () => {
             <span>History</span>
           </Link>
         </nav>
-        
+
         <div className="sidebar-footer">
           <UserMenu />
         </div>
       </aside>
-      
+
       {/* Main Chat Area */}
-      <main 
+      <main
         className={`genui-v2-main ${showRightPanel && (streamingCode || result) ? 'with-panel' : ''}`}
         style={showRightPanel && (streamingCode || result) ? { maxWidth: `calc(100vw - 72px - ${panelWidth}px)` } : {}}
       >
@@ -778,7 +827,7 @@ const GenUIChatPageV2 = () => {
             <Badge variant="primary" size="sm">GenUI</Badge>
           </div>
           {(streamingCode || result) && (
-            <button 
+            <button
               className="panel-toggle"
               onClick={() => setShowRightPanel(!showRightPanel)}
             >
@@ -786,10 +835,10 @@ const GenUIChatPageV2 = () => {
             </button>
           )}
         </header>
-        
+
         {/* Floating Workflow Indicator */}
         {loading && (
-          <motion.div 
+          <motion.div
             className="floating-workflow"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -798,7 +847,7 @@ const GenUIChatPageV2 = () => {
               {['Code Gen', 'Validate', 'Test', 'Secure'].map((step, i) => {
                 const agents = ['code_generator', 'validator', 'testing', 'security'];
                 const isActive = activeAgent?.toLowerCase().includes(agents[i].split('_')[0]);
-                const isDone = agentMessages.some(m => 
+                const isDone = agentMessages.some(m =>
                   m.agent?.toLowerCase().includes(agents[i].split('_')[0]) && m.type === 'result'
                 );
                 return (
@@ -816,7 +865,7 @@ const GenUIChatPageV2 = () => {
             </div>
           </motion.div>
         )}
-        
+
         {/* Messages */}
         <div className="messages-container">
           {messages.length === 0 && !loading && (
@@ -825,7 +874,7 @@ const GenUIChatPageV2 = () => {
                 <div className="welcome-icon">✨</div>
                 <h2>Uber Code Generator</h2>
                 <p>AI-powered code generation with real-time Generative UI</p>
-                
+
                 <div className="quick-prompts">
                   <h4>Quick Start</h4>
                   <div className="prompt-grid">
@@ -850,15 +899,16 @@ const GenUIChatPageV2 = () => {
               </div>
             </div>
           )}
-          
+
           <div className="messages-list">
             {messages.map((msg, index) => (
-              <motion.div 
+              <motion.div
                 key={index}
-                className={`message ${msg.role} ${editingMessageIndex === index ? 'editing' : ''}`}
+                className={`message ${msg.role} ${editingMessageIndex === index ? 'editing' : ''} ${msg.role === 'assistant' && msg.hasResult && selectedMessageIndex === index ? 'selected' : ''} ${msg.role === 'assistant' && msg.hasResult ? 'clickable' : ''}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
+                onClick={() => msg.role === 'assistant' && msg.hasResult && selectMessage(index)}
               >
                 <div className="message-avatar">
                   {msg.role === 'user' ? '👤' : '🤖'}
@@ -886,7 +936,7 @@ const GenUIChatPageV2 = () => {
                     <>
                       <p>{msg.content}</p>
                       {msg.role === 'user' && !loading && (
-                        <button 
+                        <button
                           className="edit-message-btn"
                           onClick={() => handleEditMessage(index, msg.content)}
                           title="Edit message"
@@ -896,49 +946,51 @@ const GenUIChatPageV2 = () => {
                       )}
                     </>
                   )}
-                  
+
                   {/* Code description for assistant messages with results */}
-                  {msg.role === 'assistant' && msg.hasResult && result && (() => {
-                    const desc = generateDescription(result.code, messages[index - 1]?.content);
+                  {msg.role === 'assistant' && msg.hasResult && msg.code_output && (() => {
+                    const desc = generateDescription(msg.code_output, messages[index - 1]?.content);
+                    const msgFixes = msg.workflow_data?.all_fixes || [];
+                    const msgTotalFixes = msgFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
                     return desc ? (
                       <div className="code-description">
                         <div className="desc-header">
                           <span className="desc-title">{desc.title}</span>
                         </div>
-                        <p className="desc-summary" dangerouslySetInnerHTML={{ 
-                          __html: desc.summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+                        <p className="desc-summary" dangerouslySetInnerHTML={{
+                          __html: desc.summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                         }} />
-                        
+
                         {desc.keyPoints.length > 0 && (
                           <div className="desc-key-points">
                             <span className="section-label">Key Components:</span>
                             <ul>
                               {desc.keyPoints.map((point, i) => (
-                                <li key={i} dangerouslySetInnerHTML={{ 
-                                  __html: point.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/`(.*?)`/g, '<code>$1</code>') 
+                                <li key={i} dangerouslySetInnerHTML={{
+                                  __html: point.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/`(.*?)`/g, '<code>$1</code>')
                                 }} />
                               ))}
                             </ul>
                           </div>
                         )}
-                        
+
                         {desc.features.length > 0 && (
                           <div className="desc-features-section">
                             <span className="section-label">Features:</span>
                             <ul className="desc-features">
                               {desc.features.slice(0, 5).map((feat, i) => (
-                                <li key={i} dangerouslySetInnerHTML={{ 
-                                  __html: feat.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+                                <li key={i} dangerouslySetInnerHTML={{
+                                  __html: feat.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                                 }} />
                               ))}
                             </ul>
                           </div>
                         )}
-                        
+
                         <div className="desc-footer">
                           <span className="desc-structure">{desc.structure}</span>
-                          {totalFixes > 0 && (
-                            <span className="desc-fixes">🔧 {totalFixes} auto-fixes applied</span>
+                          {msgTotalFixes > 0 && (
+                            <span className="desc-fixes">🔧 {msgTotalFixes} auto-fixes applied</span>
                           )}
                         </div>
                       </div>
@@ -947,9 +999,9 @@ const GenUIChatPageV2 = () => {
                 </div>
               </motion.div>
             ))}
-            
+
             {loading && (
-              <motion.div 
+              <motion.div
                 className="message assistant"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -967,11 +1019,11 @@ const GenUIChatPageV2 = () => {
                 </div>
               </motion.div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
         </div>
-        
+
         {/* Input */}
         <div className="input-container">
           <form onSubmit={handleSubmit} className="input-form">
@@ -993,13 +1045,13 @@ const GenUIChatPageV2 = () => {
           <p className="input-hint">Powered by Llama 3.3 via Groq • 4 AI Agents</p>
         </div>
       </main>
-      
+
       {/* Right Panel - Results */}
       <AnimatePresence>
         {showRightPanel && (streamingCode || result) && (
           <>
             {/* Resize Handle */}
-            <div 
+            <div
               className={`panel-resize-handle ${isResizing ? 'active' : ''}`}
               onMouseDown={startResize}
             >
@@ -1009,256 +1061,256 @@ const GenUIChatPageV2 = () => {
                 <span></span>
               </div>
             </div>
-            
-            <motion.aside 
+
+            <motion.aside
               className="genui-v2-panel"
               style={{ width: panelWidth }}
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: panelWidth, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={isResizing ? { duration: 0 } : { duration: 0.2 }}
             >
               {/* Panel Tabs */}
               <div className="panel-tabs">
-                <button 
+                <button
                   className={rightPanelTab === 'code' ? 'active' : ''}
                   onClick={() => setRightPanelTab('code')}
                 >
                   <span>📝</span> Code
                   {loading && <span className="live-dot"></span>}
                 </button>
-                <button 
+                <button
                   className={rightPanelTab === 'agents' ? 'active' : ''}
                   onClick={() => setRightPanelTab('agents')}
                 >
                   <span>🤖</span> Agents
                   {agentMessages.length > 0 && <span className="count">{agentMessages.length}</span>}
                 </button>
-                <button 
+                <button
                   className={rightPanelTab === 'fixes' ? 'active' : ''}
                   onClick={() => setRightPanelTab('fixes')}
                 >
                   <span>🔧</span> Fixes
                   {totalFixes > 0 && <span className="count">{totalFixes}</span>}
                 </button>
-            </div>
-            
-            {/* Panel Content */}
-            <div className="panel-content">
-              {/* Code Tab */}
-              {rightPanelTab === 'code' && (
-                <div className="code-panel">
-                  <div className="code-header">
-                    <div className="code-stats">
-                      <span>{streamingStats.lines || result?.code?.split('\n').length || 0} lines</span>
-                      {result?.code_was_fixed && (
-                        <Badge variant="success" size="sm">✓ Fixed</Badge>
-                      )}
-                    </div>
-                    <div className="code-actions">
-                      {result?.original_code && (
-                        <button onClick={() => setShowOriginal(!showOriginal)}>
-                          {showOriginal ? 'Show Fixed' : 'Show Original'}
+              </div>
+
+              {/* Panel Content */}
+              <div className="panel-content">
+                {/* Code Tab */}
+                {rightPanelTab === 'code' && (
+                  <div className="code-panel">
+                    <div className="code-header">
+                      <div className="code-stats">
+                        <span>{streamingStats.lines || result?.code?.split('\n').length || 0} lines</span>
+                        {result?.code_was_fixed && (
+                          <Badge variant="success" size="sm">✓ Fixed</Badge>
+                        )}
+                      </div>
+                      <div className="code-actions">
+                        {result?.original_code && (
+                          <button onClick={() => setShowOriginal(!showOriginal)}>
+                            {showOriginal ? 'Show Fixed' : 'Show Original'}
+                          </button>
+                        )}
+                        <button onClick={copyCode}>
+                          {copyStatus || 'Copy'}
                         </button>
-                      )}
-                      <button onClick={copyCode}>
-                        {copyStatus || 'Copy'}
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className={`code-view ${loading ? 'streaming' : ''} ${showCompletion ? 'completion-flash' : ''}`}>
-                    <CodeBlock
-                      code={showOriginal ? result?.original_code : (result?.code || streamingCode)}
-                      language="python"
-                      lineNumbers={true}
-                      maxHeight="calc(100vh - 250px)"
-                    />
-                    {loading && <span className="streaming-cursor" />}
-                  </div>
-                  
-                  {loading && (
-                    <div className="streaming-bar">
-                      <span className="pulse">●</span>
-                      <span>Streaming... {streamingStats.lines} lines</span>
-                    </div>
-                  )}
-                  
-                  {showCompletion && (
-                    <div className="completion-badge">
-                      <svg className="checkmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M5 13l4 4L19 7" />
-                      </svg>
-                      Generation Complete
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Agents Tab */}
-              {rightPanelTab === 'agents' && (
-                <div className="agents-panel">
-                  {/* Stats Row */}
-                  {result && (
-                    <div className="stats-row">
-                      <div className="stat-item">
-                        <span className="stat-value">{result.code?.split('\n').length || 0}</span>
-                        <span className="stat-label">Lines</span>
-                      </div>
-                      <div className="stat-item">
-                        <span className="stat-value">{totalFixes}</span>
-                        <span className="stat-label">Fixes</span>
-                      </div>
-                      <div className="stat-item">
-                        <span className="stat-value">
-                          {result.stats?.totalDuration ? `${result.stats.totalDuration}s` : '-'}
-                        </span>
-                        <span className="stat-label">Time</span>
                       </div>
                     </div>
-                  )}
-                  
-                  {/* Agent Feed - Deduplicated */}
-                  <div className="agent-feed">
-                    <AnimatePresence>
-                      {(() => {
-                        // Deduplicate agent messages by normalizing names and keeping latest
-                        const seen = new Map();
-                        const deduped = [];
-                        for (const msg of agentMessages) {
-                          const key = `${normalizeAgentName(msg.agent)}-${msg.type}`;
-                          if (!seen.has(key) || msg.type === 'result') {
-                            seen.set(key, deduped.length);
-                            deduped.push({ ...msg, agent: normalizeAgentName(msg.agent) });
-                          }
-                        }
-                        return deduped;
-                      })().map((msg, i) => (
-                        <motion.div
-                          key={i}
-                          className={`agent-item ${msg.type}`}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.03 }}
-                        >
-                          <span className="agent-icon">{getAgentIcon(msg.agent)}</span>
-                          <div className="agent-info">
-                            <span className="agent-name">{msg.agent}</span>
-                            <span className="agent-msg">{msg.message}</span>
-                          </div>
-                          <span className="agent-time">{msg.time}</span>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                  
-                  {/* Agent Results */}
-                  {result && (
-                    <div className="agent-results">
-                      <Tabs
-                        tabs={[
-                          {
-                            id: 'validation',
-                            label: 'Validator',
-                            icon: '✓',
-                            content: (
-                              <div className="agent-detail">
-                                <p>{result.validation?.message || 'Code validated'}</p>
-                                {result.validation?.fixes_applied?.length > 0 && (
-                                  <Badge variant="success">{result.validation.fixes_applied.length} fixes</Badge>
-                                )}
-                              </div>
-                            )
-                          },
-                          {
-                            id: 'testing',
-                            label: 'Testing',
-                            icon: '🧪',
-                            content: (
-                              <div className="agent-detail">
-                                <p>{result.tests?.message || 'Tests passed'}</p>
-                                {result.tests?.testability_score && (
-                                  <Badge variant="primary">Score: {result.tests.testability_score}</Badge>
-                                )}
-                              </div>
-                            )
-                          },
-                          {
-                            id: 'security',
-                            label: 'Security',
-                            icon: '🛡️',
-                            content: (
-                              <div className="agent-detail">
-                                <p>{result.security?.message || 'No vulnerabilities'}</p>
-                                {result.security?.risk_level && (
-                                  <Badge variant={result.security.risk_level === 'low' ? 'success' : 'warning'}>
-                                    Risk: {result.security.risk_level}
-                                  </Badge>
-                                )}
-                              </div>
-                            )
-                          }
-                        ]}
+
+                    <div className={`code-view ${loading ? 'streaming' : ''} ${showCompletion ? 'completion-flash' : ''}`}>
+                      <CodeBlock
+                        code={showOriginal ? result?.original_code : (result?.code || streamingCode)}
+                        language="python"
+                        lineNumbers={true}
+                        maxHeight="calc(100vh - 250px)"
                       />
+                      {loading && <span className="streaming-cursor" />}
                     </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Fixes Tab */}
-              {rightPanelTab === 'fixes' && (
-                <div className="fixes-panel">
-                  {result?.all_fixes && result.all_fixes.length > 0 ? (
-                    <div className="fixes-list">
-                      {deduplicateFixes(result.all_fixes).map((agentFix, i) => (
-                        <Expandable
-                          key={i}
-                          title={`${agentFix.agent} (${agentFix.fixes?.length || 0})`}
-                          icon={getAgentIcon(agentFix.agent)}
-                          expanded={i === 0}
-                        >
-                          {agentFix.fixes?.map((fix, j) => (
-                            <FixCard
-                              key={j}
-                              agent={agentFix.agent}
-                              description={typeof fix === 'object' ? fix.description : fix}
-                              severity={fix.severity || 'medium'}
-                              before={fix.before}
-                              after={fix.after}
-                              line={fix.line}
-                              expandable={true}
-                            />
-                          ))}
-                        </Expandable>
-                      ))}
+
+                    {loading && (
+                      <div className="streaming-bar">
+                        <span className="pulse">●</span>
+                        <span>Streaming... {streamingStats.lines} lines</span>
+                      </div>
+                    )}
+
+                    {showCompletion && (
+                      <div className="completion-badge">
+                        <svg className="checkmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 13l4 4L19 7" />
+                        </svg>
+                        Generation Complete
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Agents Tab */}
+                {rightPanelTab === 'agents' && (
+                  <div className="agents-panel">
+                    {/* Stats Row */}
+                    {result && (
+                      <div className="stats-row">
+                        <div className="stat-item">
+                          <span className="stat-value">{result.code?.split('\n').length || 0}</span>
+                          <span className="stat-label">Lines</span>
+                        </div>
+                        <div className="stat-item">
+                          <span className="stat-value">{totalFixes}</span>
+                          <span className="stat-label">Fixes</span>
+                        </div>
+                        <div className="stat-item">
+                          <span className="stat-value">
+                            {result.stats?.totalDuration ? `${result.stats.totalDuration}s` : '-'}
+                          </span>
+                          <span className="stat-label">Time</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Agent Feed - Deduplicated */}
+                    <div className="agent-feed">
+                      <AnimatePresence>
+                        {(() => {
+                          // Deduplicate agent messages by normalizing names and keeping latest
+                          const seen = new Map();
+                          const deduped = [];
+                          for (const msg of agentMessages) {
+                            const key = `${normalizeAgentName(msg.agent)}-${msg.type}`;
+                            if (!seen.has(key) || msg.type === 'result') {
+                              seen.set(key, deduped.length);
+                              deduped.push({ ...msg, agent: normalizeAgentName(msg.agent) });
+                            }
+                          }
+                          return deduped;
+                        })().map((msg, i) => (
+                          <motion.div
+                            key={i}
+                            className={`agent-item ${msg.type}`}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.03 }}
+                          >
+                            <span className="agent-icon">{getAgentIcon(msg.agent)}</span>
+                            <div className="agent-info">
+                              <span className="agent-name">{msg.agent}</span>
+                              <span className="agent-msg">{msg.message}</span>
+                            </div>
+                            <span className="agent-time">{msg.time}</span>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
                     </div>
-                  ) : (
-                    <div className="empty-state">
-                      <span>✓</span>
-                      <p>No fixes needed - code generated cleanly!</p>
-                    </div>
-                  )}
-                  
-                  {/* Code Diff */}
-                  {result?.code_was_fixed && result?.original_code && (
-                    <div className="diff-section">
-                      <h4>Full Diff</h4>
-                      <CodeDiff
-                        before={result.original_code}
-                        after={result.code}
-                        title=""
-                        expanded={false}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </motion.aside>
+
+                    {/* Agent Results */}
+                    {result && (
+                      <div className="agent-results">
+                        <Tabs
+                          tabs={[
+                            {
+                              id: 'validation',
+                              label: 'Validator',
+                              icon: '✓',
+                              content: (
+                                <div className="agent-detail">
+                                  <p>{result.validation?.message || 'Code validated'}</p>
+                                  {result.validation?.fixes_applied?.length > 0 && (
+                                    <Badge variant="success">{result.validation.fixes_applied.length} fixes</Badge>
+                                  )}
+                                </div>
+                              )
+                            },
+                            {
+                              id: 'testing',
+                              label: 'Testing',
+                              icon: '🧪',
+                              content: (
+                                <div className="agent-detail">
+                                  <p>{result.tests?.message || 'Tests passed'}</p>
+                                  {result.tests?.testability_score && (
+                                    <Badge variant="primary">Score: {result.tests.testability_score}</Badge>
+                                  )}
+                                </div>
+                              )
+                            },
+                            {
+                              id: 'security',
+                              label: 'Security',
+                              icon: '🛡️',
+                              content: (
+                                <div className="agent-detail">
+                                  <p>{result.security?.message || 'No vulnerabilities'}</p>
+                                  {result.security?.risk_level && (
+                                    <Badge variant={result.security.risk_level === 'low' ? 'success' : 'warning'}>
+                                      Risk: {result.security.risk_level}
+                                    </Badge>
+                                  )}
+                                </div>
+                              )
+                            }
+                          ]}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Fixes Tab */}
+                {rightPanelTab === 'fixes' && (
+                  <div className="fixes-panel">
+                    {result?.all_fixes && result.all_fixes.length > 0 ? (
+                      <div className="fixes-list">
+                        {deduplicateFixes(result.all_fixes).map((agentFix, i) => (
+                          <Expandable
+                            key={i}
+                            title={`${agentFix.agent} (${agentFix.fixes?.length || 0})`}
+                            icon={getAgentIcon(agentFix.agent)}
+                            expanded={i === 0}
+                          >
+                            {agentFix.fixes?.map((fix, j) => (
+                              <FixCard
+                                key={j}
+                                agent={agentFix.agent}
+                                description={typeof fix === 'object' ? fix.description : fix}
+                                severity={fix.severity || 'medium'}
+                                before={fix.before}
+                                after={fix.after}
+                                line={fix.line}
+                                expandable={true}
+                              />
+                            ))}
+                          </Expandable>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <span>✓</span>
+                        <p>No fixes needed - code generated cleanly!</p>
+                      </div>
+                    )}
+
+                    {/* Code Diff */}
+                    {result?.code_was_fixed && result?.original_code && (
+                      <div className="diff-section">
+                        <h4>Full Diff</h4>
+                        <CodeDiff
+                          before={result.original_code}
+                          after={result.code}
+                          title=""
+                          expanded={false}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.aside>
           </>
         )}
       </AnimatePresence>
-      
+
       {/* Usage Limit Modal for guests */}
       <UsageLimitModal
         isOpen={showUsageLimitModal}
