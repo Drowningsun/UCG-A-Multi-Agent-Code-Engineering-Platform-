@@ -154,6 +154,7 @@ User's follow-up request: {request.prompt}
 Please modify or rewrite the above code according to the user's request."""
 
     async def generate():
+        nonlocal enhanced_prompt
         # Initialize AG-UI event factory
         thread_id = request.session_id or str(uuid.uuid4())
         run_id = str(uuid.uuid4())
