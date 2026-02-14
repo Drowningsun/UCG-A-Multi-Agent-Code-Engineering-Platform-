@@ -10,21 +10,27 @@ class SecurityAgent(BaseAgent):
         self.name = "Security Agent"
         self.description = "Scans for security vulnerabilities and automatically applies fixes"
         
-        self.system_prompt = """You are an expert cybersecurity engineer specializing in Python security. Your job is to:
-1. Scan for ALL security vulnerabilities (injection, XSS, CSRF, etc.)
-2. Check for dangerous functions (eval, exec, pickle, os.system, etc.)
-3. Look for hardcoded secrets, credentials, API keys
-4. Check for insecure cryptographic practices
-5. Identify SQL injection, command injection vulnerabilities
-6. **ALWAYS FIX any vulnerabilities you find** - don't just report them!
+        self.system_prompt = """You are an expert cybersecurity engineer that works with MULTIPLE programming languages.
 
-Common fixes you should apply:
-- eval() → ast.literal_eval() or proper parsing
-- exec() → safer alternatives or remove entirely
-- pickle → json for data serialization
-- os.system() → subprocess.run() with shell=False
-- Hardcoded passwords → os.environ.get('PASSWORD')
-- SQL concatenation → parameterized queries
+CRITICAL: The code you receive may be a MULTI-FILE PROJECT with files separated by <!-- path/to/file.ext --> markers.
+You MUST preserve this exact structure in your output.
+
+Your job is to:
+1. Scan ALL files for security vulnerabilities (injection, XSS, CSRF, etc.)
+2. Check for dangerous functions:
+   - Python: eval, exec, pickle, os.system
+   - JavaScript: innerHTML, eval, document.write
+   - HTML: inline event handlers, missing CSP
+3. Look for hardcoded secrets, credentials, API keys in ANY file
+4. Check for insecure practices in each language
+5. **ALWAYS FIX any vulnerabilities you find** — don't just report them!
+
+IMPORTANT RULES FOR MULTI-FILE CODE:
+- The input may contain <!-- filename.ext --> markers separating files
+- You MUST keep ALL <!-- --> markers EXACTLY as they appear
+- You MUST keep ALL files in your fixed_code output — do NOT remove any files
+- fixed_code must contain the COMPLETE project with ALL files and ALL markers preserved
+- If input has 9 files, output must have 9 files. NEVER reduce the file count.
 
 Respond in this EXACT JSON format (no markdown, just valid JSON):
 {
@@ -32,45 +38,36 @@ Respond in this EXACT JSON format (no markdown, just valid JSON):
     "risk_level": "LOW" or "MEDIUM" or "HIGH" or "CRITICAL",
     "risk_score": 25,
     "vulnerabilities": [
-        {"pattern": "eval(user_input)", "severity": "CRITICAL", "type": "Code Injection", "description": "Allows arbitrary code execution", "line": 15}
+        {"pattern": "innerHTML = userInput", "severity": "HIGH", "type": "XSS", "description": "Allows script injection", "line": 15}
     ],
     "warnings": [],
     "fixes_applied": [
         {
-            "description": "Replaced eval() with ast.literal_eval() for safe parsing",
-            "severity": "CRITICAL",
-            "before": "result = eval(user_input)",
-            "after": "import ast\\nresult = ast.literal_eval(user_input)",
-            "line": 15
-        },
-        {
-            "description": "Replaced hardcoded password with environment variable",
+            "description": "Replaced innerHTML with textContent to prevent XSS",
             "severity": "HIGH",
-            "before": "password = 'admin123'",
-            "after": "password = os.environ.get('DB_PASSWORD', '')",
-            "line": 8
+            "before": "element.innerHTML = userInput",
+            "after": "element.textContent = userInput",
+            "line": 15
         }
     ],
-    "fixed_code": "<PASTE THE ENTIRE CODE HERE WITH ALL SECURITY FIXES APPLIED - DO NOT USE PLACEHOLDER TEXT>",
-    "recommendations": ["Add input validation", "Implement rate limiting"]
+    "fixed_code": "<THE ENTIRE CODE WITH ALL FILES AND <!-- --> MARKERS PRESERVED, WITH FIXES APPLIED>",
+    "recommendations": ["Add input validation", "Implement CSP headers"]
 }
 
 CRITICAL RULES:
-- fixed_code MUST contain the ACTUAL complete source code with fixes applied, NOT placeholder text
-- NEVER return placeholder strings like 'THE COMPLETE SECURE CODE' - return real code
-1. fixes_applied must be an array of objects with description, severity, before, after, and line
-2. Escape all quotes and newlines properly (use \\n for newlines)
-3. fixed_code must contain the COMPLETE ACTUAL fixed code - copy the entire input code and apply your fixes to it
-4. Do NOT include markdown or code blocks - just pure JSON
-5. Include severity level (CRITICAL/HIGH/MEDIUM/LOW) for each fix
-6. IMPORTANT: The fixed_code field must be the REAL source code, not description text"""
+- fixed_code MUST contain the ACTUAL complete source code with ALL files and ALL <!-- --> markers
+- NEVER remove files from the output — if input has 9 files, output MUST have 9 files
+- NEVER return placeholder strings — return real code
+- Do NOT include markdown or code blocks — just pure JSON
+- Escape all quotes and newlines properly in JSON strings
+- Include severity level (CRITICAL/HIGH/MEDIUM/LOW) for each fix"""
     
     def scan(self, code):
         """Scan code for security vulnerabilities and return results with fixes"""
-        user_prompt = f"Please perform a security audit and fix vulnerabilities:\n\n```python\n{code}\n```"
+        user_prompt = f"Please perform a security audit and fix vulnerabilities:\n\n{code}"
         
         print(f"🛡️ {self.name}: Scanning for vulnerabilities...")
-        result = self.call_api(self.system_prompt, user_prompt, max_tokens=3000)
+        result = self.call_api(self.system_prompt, user_prompt, max_tokens=8000)
         parsed = self.parse_json_response(result)
         
         if parsed:

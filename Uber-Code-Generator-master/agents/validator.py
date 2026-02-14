@@ -10,16 +10,23 @@ class ValidationAgent(BaseAgent):
         self.name = "Validation Agent"
         self.description = "Validates code for style, syntax, and best practices with auto-fix capability"
         
-        self.system_prompt = """You are an expert Python code reviewer and validator. Your job is to:
-1. Analyze the code for syntax errors, style issues, and best practice violations
-2. Check for PEP8 compliance, proper indentation, naming conventions
-3. Look for missing docstrings, type hints, and code organization issues
-4. **ALWAYS FIX any issues you find** - don't just report them!
+        self.system_prompt = """You are an expert code reviewer and validator that works with MULTIPLE programming languages.
 
-IMPORTANT: If you find ANY issues, you MUST:
-- Fix them in the code
-- Provide the complete fixed code in "fixed_code"
-- List each fix with clear before/after examples
+CRITICAL: The code you receive may be a MULTI-FILE PROJECT with files separated by <!-- path/to/file.ext --> markers.
+You MUST preserve this exact structure in your output.
+
+Your job is to:
+1. Analyze EACH file for syntax errors, style issues, and best practice violations
+2. Check for proper naming conventions, missing documentation, and code organization
+3. Detect the language of each file from its extension (JS, HTML, CSS, Python, etc.)
+4. **ALWAYS FIX any issues you find** — don't just report them!
+
+IMPORTANT RULES FOR MULTI-FILE CODE:
+- The input may contain <!-- filename.ext --> markers separating files
+- You MUST keep ALL <!-- --> markers EXACTLY as they appear
+- You MUST keep ALL files in your fixed_code output — do NOT remove any files
+- fixed_code must contain the COMPLETE project with ALL files and ALL markers preserved
+- If input has 9 files, output must have 9 files. NEVER reduce the file count.
 
 Respond in this EXACT JSON format (no markdown, just valid JSON):
 {
@@ -36,36 +43,28 @@ Respond in this EXACT JSON format (no markdown, just valid JSON):
     },
     "fixes_applied": [
         {
-            "description": "Added docstring to function calculate()",
-            "before": "def calculate(x, y):",
-            "after": "def calculate(x, y):\\n    \\\"\\\"\\\"Calculate sum of two numbers.\\\"\\\"\\\"",
+            "description": "Added error handling to TodoForm.js",
+            "before": "const handleSubmit = () => {",
+            "after": "const handleSubmit = () => {\\n    if (!input.trim()) return;",
             "line": 10
-        },
-        {
-            "description": "Added type hints to process()",
-            "before": "def process(data):",
-            "after": "def process(data: dict) -> bool:",
-            "line": 25
         }
     ],
-    "fixed_code": "<PASTE THE ENTIRE CODE HERE WITH ALL FIXES APPLIED - DO NOT USE PLACEHOLDER TEXT>"
+    "fixed_code": "<THE ENTIRE CODE WITH ALL FILES AND <!-- --> MARKERS PRESERVED, WITH FIXES APPLIED>"
 }
 
 CRITICAL RULES:
-- fixed_code MUST contain the ACTUAL complete source code with fixes applied, NOT placeholder text
-- NEVER return placeholder strings like 'THE COMPLETE FIXED CODE HERE' - return real code
-1. fixes_applied must be an array of objects with description, before, after, and line
-2. Escape all quotes and newlines properly in strings
-3. fixed_code must contain the COMPLETE ACTUAL fixed code - copy the entire input code and apply your fixes to it
-4. Do NOT include markdown or code blocks - just pure JSON
-5. IMPORTANT: The fixed_code field must be the REAL source code, not description text"""
+- fixed_code MUST contain the ACTUAL complete source code with ALL files and ALL <!-- --> markers
+- NEVER remove files from the output — if input has 9 files, output MUST have 9 files
+- NEVER return placeholder strings — return real code
+- Do NOT include markdown or code blocks — just pure JSON
+- Escape all quotes and newlines properly in JSON strings"""
     
     def validate(self, code):
         """Validate code and return analysis with potential fixes"""
-        user_prompt = f"Please validate and fix if needed:\n\n```python\n{code}\n```"
+        user_prompt = f"Please validate and fix if needed:\n\n{code}"
         
         print(f"🔍 {self.name}: Analyzing code...")
-        result = self.call_api(self.system_prompt, user_prompt, max_tokens=3000)
+        result = self.call_api(self.system_prompt, user_prompt, max_tokens=8000)
         parsed = self.parse_json_response(result)
         
         if parsed:

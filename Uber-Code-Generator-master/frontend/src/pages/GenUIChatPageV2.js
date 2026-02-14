@@ -17,6 +17,7 @@ import {
 } from '../components/GenUIComponents';
 import { useAGUIState, parseSSEData } from '../components/AGUIRenderer';
 import '../components/GenUIComponents.css';
+import TabbedCodeBlock from '../components/TabbedCodeBlock';
 import './GenUIChatPageV2.css';
 
 const API_BASE = 'http://localhost:5000/api';
@@ -49,10 +50,14 @@ const GenUIChatPageV2 = () => {
   const [result, setResult] = useState(null);
   const [showOriginal, setShowOriginal] = useState(false);
 
+  // Sidebar state - default expanded
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [chatSessions, setChatSessions] = useState([]);
+
   // Edit message state
   const [editingMessageIndex, setEditingMessageIndex] = useState(null);
   const [editingContent, setEditingContent] = useState('');
-  
+
   // Selected message index for viewing previous results
   const [selectedMessageIndex, setSelectedMessageIndex] = useState(null);
 
@@ -96,7 +101,7 @@ const GenUIChatPageV2 = () => {
 
     const handleMouseMove = (e) => {
       const diff = resizeRef.current - e.clientX;
-      const newWidth = Math.min(Math.max(panelWidthRef.current + diff, 350), 900);
+      const newWidth = Math.min(Math.max(panelWidthRef.current + diff, 520), 900);
       panelWidthRef.current = newWidth;
       resizeRef.current = e.clientX;
       setPanelWidth(newWidth);
@@ -218,6 +223,39 @@ const GenUIChatPageV2 = () => {
     }
   };
 
+  // --- Sidebar: fetch chat sessions ---
+  const fetchSessions = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const response = await authAxios.get('/sessions');
+      setChatSessions(response.data || []);
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+    }
+  }, [isAuthenticated, authAxios]);
+
+  // Fetch sessions on mount
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  // Relative time helper
+  const timeAgo = (dateStr) => {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const seconds = Math.floor((now - date) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const sidebarWidth = sidebarExpanded ? 280 : 72;
+
   const createSession = async () => {
     // Only create sessions for authenticated users
     if (!isAuthenticated) {
@@ -246,6 +284,7 @@ const GenUIChatPageV2 = () => {
       resetAGUI();
       sessionCreatedRef.current = true;
       navigate(`/chat/${newSessionId}`);
+      fetchSessions();
     } catch (error) {
       console.error('Error creating session:', error);
     }
@@ -418,8 +457,8 @@ const GenUIChatPageV2 = () => {
               // Calculate duration
               const duration = data.payload?.stats?.totalDuration || ((Date.now() - startTime) / 1000).toFixed(1);
 
-              // Use our captured originalCode, fallback to backend's original_code
-              const finalOriginalCode = originalCode || data.payload?.original_code || null;
+              // Use our locally captured originalCode — do NOT fallback to result state (it may be stale)
+              const finalOriginalCode = originalCode || null;
 
               const finalResult = {
                 code: data.payload?.code || fullCode,
@@ -451,12 +490,11 @@ const GenUIChatPageV2 = () => {
       const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
       const assistantContent = `Generated ${fullCode.split('\n').length} lines of code${totalFixCount > 0 ? ` with ${totalFixCount} auto-fixes` : ''} in ${totalDuration}s`;
 
-      // Build final result for state
-      // Use captured originalCode (code before any fixes were applied)
-      const finalOriginalCodeForSave = originalCode || result?.original_code || null;
+      // Use captured originalCode (code before any fixes were applied) — do NOT fallback to stale result
+      const finalOriginalCodeForSave = originalCode || null;
       const savedResult = {
         code: fullCode,
-        original_code: finalOriginalCodeForSave,
+        original_code: (totalFixCount > 0 && finalOriginalCodeForSave && finalOriginalCodeForSave !== fullCode) ? finalOriginalCodeForSave : null,
         all_fixes: finalAllFixes,
         code_was_fixed: totalFixCount > 0 || (originalCode && originalCode !== fullCode),
         total_fixes: totalFixCount,
@@ -547,65 +585,6 @@ const GenUIChatPageV2 = () => {
     }
   };
 
-  const [copyStatus, setCopyStatus] = useState('');
-
-  const copyCode = async () => {
-    const codeToCopy = showOriginal ? result?.original_code : (result?.code || streamingCode);
-    if (!codeToCopy) {
-      setCopyStatus('No code');
-      setTimeout(() => setCopyStatus(''), 2000);
-      return;
-    }
-
-    // Try multiple methods to copy
-    let success = false;
-
-    // Method 1: Modern Clipboard API
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(codeToCopy);
-        success = true;
-      } catch (err) {
-        console.log('Clipboard API failed:', err);
-      }
-    }
-
-    // Method 2: execCommand fallback
-    if (!success) {
-      const textArea = document.createElement('textarea');
-      textArea.value = codeToCopy;
-      textArea.style.position = 'fixed';
-      textArea.style.top = '0';
-      textArea.style.left = '0';
-      textArea.style.width = '2em';
-      textArea.style.height = '2em';
-      textArea.style.padding = '0';
-      textArea.style.border = 'none';
-      textArea.style.outline = 'none';
-      textArea.style.boxShadow = 'none';
-      textArea.style.background = 'transparent';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-
-      try {
-        success = document.execCommand('copy');
-      } catch (err) {
-        console.log('execCommand failed:', err);
-      }
-
-      document.body.removeChild(textArea);
-    }
-
-    if (success) {
-      setCopyStatus('✓ Copied!');
-    } else {
-      // If all else fails, show code in alert for manual copy
-      setCopyStatus('Select & Copy');
-      window.prompt('Copy this code (Ctrl+C):', codeToCopy.substring(0, 500) + (codeToCopy.length > 500 ? '...' : ''));
-    }
-    setTimeout(() => setCopyStatus(''), 2000);
-  };
 
   const getAgentIcon = (agentId) => {
     const icons = {
@@ -790,25 +769,75 @@ const GenUIChatPageV2 = () => {
 
   return (
     <div className={`genui-v2 ${isResizing ? 'resizing' : ''}`}>
-      {/* Minimal Sidebar */}
-      <aside className="genui-v2-sidebar">
+      {/* Expandable Sidebar */}
+      <aside className={`genui-v2-sidebar ${sidebarExpanded ? 'sidebar-expanded' : ''}`}>
         <div className="sidebar-brand">
           <Link to="/" className="brand-link">
             <span className="brand-icon">🚀</span>
-            <span className="brand-text">Uber Code</span>
+            {sidebarExpanded && <span className="brand-text-full">Uber Code</span>}
+            {!sidebarExpanded && <span className="brand-text">UBER CODE</span>}
           </Link>
         </div>
 
         <nav className="sidebar-actions">
           <button className="action-btn primary" onClick={createSession}>
             <span>+</span>
-            <span>New</span>
+            {sidebarExpanded && <span className="action-label">New Chat</span>}
+            {!sidebarExpanded && <span>New</span>}
           </button>
           <Link to="/dashboard" className="action-btn">
             <span>📊</span>
-            <span>History</span>
+            {sidebarExpanded && <span className="action-label">Dashboard</span>}
+            {!sidebarExpanded && <span>History</span>}
           </Link>
+
+          <button
+            className="action-btn sidebar-toggle"
+            onClick={() => setSidebarExpanded(!sidebarExpanded)}
+            title={sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            <span className={`toggle-arrow ${sidebarExpanded ? 'expanded' : ''}`}>›</span>
+            {sidebarExpanded && <span className="action-label">Collapse</span>}
+          </button>
         </nav>
+
+        {/* Chat Sessions List (expanded only) */}
+        {sidebarExpanded && isAuthenticated && (
+          <div className="sidebar-chats">
+            <div className="chats-header">
+              <span>Recent Chats</span>
+              <span className="chats-count">{chatSessions.filter(s => s.message_count > 0).length}</span>
+            </div>
+            <div className="chats-list">
+              {chatSessions
+                .filter(session => session.message_count > 0)
+                .map((session) => (
+                  <button
+                    key={session.session_id}
+                    className={`chat-item ${session.session_id === sessionId ? 'active' : ''}`}
+                    onClick={() => {
+                      navigate(`/chat/${session.session_id}`);
+                    }}
+                    title={session.title}
+                  >
+                    <span className="chat-icon">💬</span>
+                    <div className="chat-item-info">
+                      <span className="chat-item-title">{session.title || 'New Chat'}</span>
+                      <span className="chat-item-meta">
+                        {timeAgo(session.updated_at)}
+                        {session.message_count > 0 && (
+                          <span className="chat-msg-count">· {session.message_count} msgs</span>
+                        )}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              {chatSessions.filter(s => s.message_count > 0).length === 0 && (
+                <div className="chats-empty">No active chats</div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="sidebar-footer">
           <UserMenu />
@@ -818,7 +847,7 @@ const GenUIChatPageV2 = () => {
       {/* Main Chat Area */}
       <main
         className={`genui-v2-main ${showRightPanel && (streamingCode || result) ? 'with-panel' : ''}`}
-        style={showRightPanel && (streamingCode || result) ? { maxWidth: `calc(100vw - 72px - ${panelWidth}px)` } : {}}
+        style={showRightPanel && (streamingCode || result) ? { maxWidth: `calc(100vw - ${sidebarWidth}px - ${panelWidth}px)` } : {}}
       >
         {/* Header */}
         <header className="main-header">
@@ -1066,9 +1095,9 @@ const GenUIChatPageV2 = () => {
               className="genui-v2-panel"
               style={{ width: panelWidth }}
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: panelWidth, opacity: 1 }}
+              animate={isResizing ? undefined : { width: panelWidth, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              transition={isResizing ? { duration: 0 } : { duration: 0.2 }}
+              transition={{ duration: 0.2 }}
             >
               {/* Panel Tabs */}
               <div className="panel-tabs">
@@ -1113,17 +1142,12 @@ const GenUIChatPageV2 = () => {
                             {showOriginal ? 'Show Fixed' : 'Show Original'}
                           </button>
                         )}
-                        <button onClick={copyCode}>
-                          {copyStatus || 'Copy'}
-                        </button>
                       </div>
                     </div>
 
                     <div className={`code-view ${loading ? 'streaming' : ''} ${showCompletion ? 'completion-flash' : ''}`}>
-                      <CodeBlock
+                      <TabbedCodeBlock
                         code={showOriginal ? result?.original_code : (result?.code || streamingCode)}
-                        language="python"
-                        lineNumbers={true}
                         maxHeight="calc(100vh - 250px)"
                       />
                       {loading && <span className="streaming-cursor" />}

@@ -10,64 +10,64 @@ class TestingAgent(BaseAgent):
         self.name = "Testing Agent"
         self.description = "Analyzes code testability, adds error handling, and suggests test cases"
         
-        self.system_prompt = """You are an expert Python testing engineer. Your job is to:
-1. Analyze the code for testability issues
-2. Check if proper error handling exists (try/except)
+        self.system_prompt = """You are an expert testing engineer that works with MULTIPLE programming languages.
+
+CRITICAL: The code you receive may be a MULTI-FILE PROJECT with files separated by <!-- path/to/file.ext --> markers.
+You MUST preserve this exact structure in your output.
+
+Your job is to:
+1. Analyze the code for testability issues across all files
+2. Check if proper error handling exists (try/catch, try/except, etc.)
 3. Verify input validation is present
 4. Check for edge cases that should be handled
-5. **ALWAYS FIX any issues you find** - add error handling, validation, etc.
+5. **ALWAYS FIX any issues you find** — add error handling, validation, etc.
 
-IMPORTANT: If you find ANY issues, you MUST:
-- Fix them by adding try/except blocks, input validation, etc.
-- Provide the complete fixed code in "fixed_code"
-- List each fix with clear before/after examples
+IMPORTANT RULES FOR MULTI-FILE CODE:
+- The input may contain <!-- filename.ext --> markers separating files
+- You MUST keep ALL <!-- --> markers EXACTLY as they appear
+- You MUST keep ALL files in your fixed_code output — do NOT remove any files
+- fixed_code must contain the COMPLETE project with ALL files and ALL markers preserved
+- If input has 9 files, output must have 9 files. NEVER reduce the file count.
 
 Respond in this EXACT JSON format (no markdown, just valid JSON):
 {
     "status": "all_passed" or "warnings" or "failed",
     "testability_score": 75,
     "results": [
-        {"test_name": "Error handling", "status": "warning", "description": "Missing try/except", "duration": "0.01s"}
+        {"test_name": "Error handling", "status": "warning", "description": "Missing try/catch", "duration": "0.01s"}
     ],
-    "issues_found": ["No error handling", "Missing input validation"],
+    "issues_found": ["No error handling in localStorage.js"],
     "fixes_applied": [
         {
-            "description": "Added try/except block for database operations",
-            "before": "result = db.query(sql)\\nreturn result",
-            "after": "try:\\n    result = db.query(sql)\\n    return result\\nexcept Exception as e:\\n    return None",
+            "description": "Added try/catch block for localStorage operations",
+            "before": "const data = JSON.parse(localStorage.getItem(key));",
+            "after": "try {\\n    const data = JSON.parse(localStorage.getItem(key));\\n} catch (e) {\\n    console.error(e);\\n}",
             "line": 15
-        },
-        {
-            "description": "Added input validation for user_id",
-            "before": "def get_user(user_id):",
-            "after": "def get_user(user_id):\\n    if not user_id:\\n        raise ValueError('user_id required')",
-            "line": 5
         }
     ],
-    "fixed_code": "<PASTE THE ENTIRE CODE HERE WITH ALL ERROR HANDLING ADDED - DO NOT USE PLACEHOLDER TEXT>",
-    "suggested_tests": ["Test with valid input", "Test with None", "Test exception handling"]
+    "fixed_code": "<THE ENTIRE CODE WITH ALL FILES AND <!-- --> MARKERS PRESERVED, WITH FIXES APPLIED>",
+    "suggested_tests": ["Test with valid input", "Test with None/null", "Test exception handling"]
 }
 
 CRITICAL RULES:
-- fixed_code MUST contain the ACTUAL complete source code with fixes applied, NOT placeholder text
-- NEVER return placeholder strings like 'THE COMPLETE FIXED CODE' - return real code
-1. fixes_applied must be an array of objects with description, before, after, and line
-2. Escape all quotes and newlines properly (use \\n for newlines)
-3. fixed_code must contain the COMPLETE ACTUAL fixed code - copy the entire input code and apply your fixes to it
-4. Do NOT include markdown or code blocks - just pure JSON
-5. IMPORTANT: The fixed_code field must be the REAL source code, not description text
+- fixed_code MUST contain the ACTUAL complete source code with ALL files and ALL <!-- --> markers
+- NEVER remove files from the output — if input has 9 files, output MUST have 9 files
+- NEVER return placeholder strings — return real code
+- Do NOT include markdown or code blocks — just pure JSON
+- Escape all quotes and newlines properly in JSON strings
 
 Focus on adding:
-- try/except blocks for risky operations
+- try/catch or try/except blocks for risky operations
 - Input validation checks
-- Edge case handling"""
+- Edge case handling
+- Null/undefined checks"""
     
     def test(self, code):
         """Analyze code testability and return results with potential fixes"""
-        user_prompt = f"Please analyze testability and fix issues:\n\n```python\n{code}\n```"
+        user_prompt = f"Please analyze testability and fix issues:\n\n{code}"
         
         print(f"🧪 {self.name}: Analyzing testability...")
-        result = self.call_api(self.system_prompt, user_prompt, max_tokens=3000)
+        result = self.call_api(self.system_prompt, user_prompt, max_tokens=8000)
         parsed = self.parse_json_response(result)
         
         if parsed:
