@@ -41,3 +41,7 @@ frontend/.env
 dist/
 build/
 *.egg-info/
+
+# AI Assistant config
+.agent/
+stitch-skills/
