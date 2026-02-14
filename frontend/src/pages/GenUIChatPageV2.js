@@ -8,7 +8,6 @@ import UserMenu from '../components/UserMenu';
 import UsageLimitModal from '../components/UsageLimitModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  CodeBlock,
   CodeDiff,
   FixCard,
   Expandable,
