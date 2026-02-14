@@ -486,7 +486,8 @@ const GenUIChatPageV2 = () => {
         }
       }
 
-      const totalFixCount = finalAllFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
+      const deduplicatedFinalFixes = deduplicateFixes(finalAllFixes);
+      const totalFixCount = deduplicatedFinalFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
       const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
       const assistantContent = `Generated ${fullCode.split('\n').length} lines of code${totalFixCount > 0 ? ` with ${totalFixCount} auto-fixes` : ''} in ${totalDuration}s`;
 
@@ -980,7 +981,8 @@ const GenUIChatPageV2 = () => {
                   {msg.role === 'assistant' && msg.hasResult && msg.code_output && (() => {
                     const desc = generateDescription(msg.code_output, messages[index - 1]?.content);
                     const msgFixes = msg.workflow_data?.all_fixes || [];
-                    const msgTotalFixes = msgFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
+                    const msgDedupFixes = deduplicateFixes(msgFixes);
+                    const msgTotalFixes = msgDedupFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
                     return desc ? (
                       <div className="code-description">
                         <div className="desc-header">
