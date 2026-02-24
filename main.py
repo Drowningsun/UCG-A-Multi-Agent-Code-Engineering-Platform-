@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 import json
 import time
+import re
 
 from config import settings
 from database import connect_to_mongo, close_mongo_connection, SessionDB, MessageDB
@@ -167,9 +168,20 @@ Please modify or rewrite the above code according to the user's request."""
         gen_start = time.time()
         line_count = 0
         
+        fence_stripped = False  # Track if we already stripped opening fence
+        
         # Use enhanced_prompt that includes context if available
         for chunk in orchestrator.generate_code_stream(enhanced_prompt):
             full_code += chunk
+            
+            # Strip opening markdown fence from very first chunk (e.g. ```python\n)
+            if not fence_stripped:
+                import re
+                full_code = re.sub(r'^```\w*\n', '', full_code)
+                fence_stripped = True
+                # Recalculate chunk to send only the cleaned content
+                chunk = full_code
+            
             line_count = len(full_code.splitlines())
             
             # Send chunk with UI metadata
@@ -184,9 +196,23 @@ Please modify or rewrite the above code according to the user's request."""
             }
             yield f"data: {json.dumps(chunk_event)}\n\n"
         
+        # Strip trailing ``` fence if present
+        if full_code.rstrip().endswith('```'):
+            full_code = full_code.rstrip()
+            full_code = full_code[:full_code.rfind('```')].rstrip()
+        
         gen_duration = time.time() - gen_start
         original_code = full_code
         current_code = full_code
+        
+        # Strip markdown fences if LLM included them (e.g. ```python ... ```)
+        code_lines = current_code.split('\n')
+        if code_lines and re.match(r'^```\w*$', code_lines[0].strip()):
+            code_lines = code_lines[1:]
+        if code_lines and code_lines[-1].strip() == '```':
+            code_lines = code_lines[:-1]
+        current_code = '\n'.join(code_lines)
+        original_code = current_code
         
         # Code generator complete
         workflow_steps[0]["status"] = "complete"
@@ -228,7 +254,12 @@ Please modify or rewrite the above code according to the user's request."""
         # Process fixes with rich UI specs
         val_fixes = []
         if validation.get('fixed_code') and validation.get('fixes_applied'):
-            current_code = validation['fixed_code']
+            fixed = validation['fixed_code']
+            # Strip markdown fences from agent output
+            fl = fixed.split('\n')
+            if fl and re.match(r'^```\w*$', fl[0].strip()): fl = fl[1:]
+            if fl and fl[-1].strip() == '```': fl = fl[:-1]
+            current_code = '\n'.join(fl)
             for fix in validation['fixes_applied']:
                 if isinstance(fix, dict):
                     fix_spec = create_fix_spec(
@@ -325,7 +356,12 @@ Please modify or rewrite the above code according to the user's request."""
         
         test_fixes = []
         if tests.get('fixed_code') and tests.get('fixes_applied'):
-            current_code = tests['fixed_code']
+            fixed = tests['fixed_code']
+            # Strip markdown fences from agent output
+            fl = fixed.split('\n')
+            if fl and re.match(r'^```\w*$', fl[0].strip()): fl = fl[1:]
+            if fl and fl[-1].strip() == '```': fl = fl[:-1]
+            current_code = '\n'.join(fl)
             for fix in tests['fixes_applied']:
                 if isinstance(fix, dict):
                     fix_spec = create_fix_spec(
@@ -420,7 +456,12 @@ Please modify or rewrite the above code according to the user's request."""
         
         sec_fixes = []
         if security.get('fixed_code') and security.get('fixes_applied'):
-            current_code = security['fixed_code']
+            fixed = security['fixed_code']
+            # Strip markdown fences from agent output
+            fl = fixed.split('\n')
+            if fl and re.match(r'^```\w*$', fl[0].strip()): fl = fl[1:]
+            if fl and fl[-1].strip() == '```': fl = fl[:-1]
+            current_code = '\n'.join(fl)
             for fix in security['fixes_applied']:
                 if isinstance(fix, dict):
                     fix_spec = create_fix_spec(

@@ -1158,6 +1158,14 @@ const GenUIChatPageV2 = () => {
                             {showOriginal ? 'Show Fixed' : 'Show Original'}
                           </button>
                         )}
+                        <button onClick={() => {
+                          const codeToCopy = showOriginal ? result?.original_code : (result?.code || streamingCode);
+                          if (codeToCopy) {
+                            navigator.clipboard.writeText(codeToCopy);
+                            const btn = document.querySelector('.copy-code-btn');
+                            if (btn) { btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = '📋 Copy Code', 1500); }
+                          }
+                        }} className="copy-code-btn">📋 Copy Code</button>
                       </div>
                     </div>
 
@@ -1255,9 +1263,23 @@ const GenUIChatPageV2 = () => {
                               icon: '✓',
                               content: (
                                 <div className="agent-detail">
-                                  <p>{result.validation?.message || 'Code validated'}</p>
+                                  <p>
+                                    {result.validation?.status === 'passed' ? '✅ Validation passed' :
+                                     result.validation?.status === 'warnings' ? '⚠️ Passed with warnings' :
+                                     result.validation?.status === 'failed' ? '❌ Validation failed' :
+                                     '✅ Code validated'}
+                                    {' — '}
+                                    {result.validation?.issues?.length || 0} issues, {result.validation?.fixes_applied?.length || 0} fixes
+                                  </p>
                                   {result.validation?.fixes_applied?.length > 0 && (
                                     <Badge variant="success">{result.validation.fixes_applied.length} fixes</Badge>
+                                  )}
+                                  {result.validation?.issues?.length > 0 && (
+                                    <div className="agent-issues">
+                                      {result.validation.issues.slice(0, 3).map((issue, idx) => (
+                                        <p key={idx} className="agent-issue-item">• {issue}</p>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
                               )
@@ -1268,9 +1290,22 @@ const GenUIChatPageV2 = () => {
                               icon: '🧪',
                               content: (
                                 <div className="agent-detail">
-                                  <p>{result.tests?.message || 'Tests passed'}</p>
+                                  <p>
+                                    {result.tests?.status === 'all_passed' ? '✅ All tests passed' :
+                                     result.tests?.status === 'warnings' ? '⚠️ Warnings found' :
+                                     result.tests?.status === 'failed' ? '❌ Tests failed' :
+                                     '✅ Testing complete'}
+                                    {result.tests?.fixes_applied?.length > 0 && ` — ${result.tests.fixes_applied.length} improvements`}
+                                  </p>
                                   {result.tests?.testability_score && (
-                                    <Badge variant="primary">Score: {result.tests.testability_score}</Badge>
+                                    <Badge variant="primary">Testability: {result.tests.testability_score}/100</Badge>
+                                  )}
+                                  {result.tests?.issues_found?.length > 0 && (
+                                    <div className="agent-issues">
+                                      {result.tests.issues_found.slice(0, 3).map((issue, idx) => (
+                                        <p key={idx} className="agent-issue-item">• {issue}</p>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
                               )
@@ -1281,11 +1316,28 @@ const GenUIChatPageV2 = () => {
                               icon: '🛡️',
                               content: (
                                 <div className="agent-detail">
-                                  <p>{result.security?.message || 'No vulnerabilities'}</p>
+                                  <p>
+                                    {result.security?.status === 'secure' ? '✅ No vulnerabilities found' :
+                                     '⚠️ Vulnerabilities found'}
+                                    {result.security?.risk_level && ` — Risk: ${result.security.risk_level}`}
+                                    {result.security?.fixes_applied?.length > 0 && ` — ${result.security.fixes_applied.length} fixes`}
+                                  </p>
                                   {result.security?.risk_level && (
-                                    <Badge variant={result.security.risk_level === 'low' ? 'success' : 'warning'}>
+                                    <Badge variant={
+                                      result.security.risk_level === 'LOW' ? 'success' :
+                                      result.security.risk_level === 'MEDIUM' ? 'warning' : 'danger'
+                                    }>
                                       Risk: {result.security.risk_level}
                                     </Badge>
+                                  )}
+                                  {result.security?.vulnerabilities?.length > 0 && (
+                                    <div className="agent-issues">
+                                      {result.security.vulnerabilities.slice(0, 3).map((v, idx) => (
+                                        <p key={idx} className="agent-issue-item">
+                                          • [{v.severity}] {v.type}: {v.description}
+                                        </p>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
                               )

@@ -42,21 +42,33 @@ CRITICAL OUTPUT FORMAT RULES:
    - Any request that does NOT ask for an app, project, website, system, dashboard, or platform
    For single-file output: just output the raw code with NO <!-- --> markers.
 
-5. Do NOT wrap code in markdown code blocks. Output raw code only.
+5. Do NOT wrap code in markdown code blocks (``` or ```python or ```js etc.). Output raw code only.
 6. Each file should be complete, functional, and well-documented with comments.
 7. Include proper error handling, input validation, and edge case handling.
-8. Write clean, idiomatic code following the conventions of the chosen language/framework."""
+8. Write clean, idiomatic code following the conventions of the chosen language/framework.
+9. COMMENTS: Use ONLY brief single-line comments where necessary. NEVER add docstrings (no triple-quote blocks), NEVER add a comment to every line, NEVER add section header comments. Code should be self-documenting. Example of good commenting: one short comment per logical block, like "# Sort the array" — not a comment on every single line.
+10. NEVER include markdown language tags like ```python, ```javascript, ```html etc. in the output. Output ONLY raw source code."""
         
     def generate(self, prompt):
         """Non-streaming code generation"""
         result = self.call_api(self.system_prompt, prompt)
         if result:
-            # Remove markdown code blocks if present
-            if result.startswith('```'):
-                lines = result.split('\n')
-                result = '\n'.join(lines[1:-1]) if lines[-1].strip() == '```' else '\n'.join(lines[1:])
+            result = self._strip_markdown_fences(result)
             return result
         return self._mock_generate(prompt)
+    
+    @staticmethod
+    def _strip_markdown_fences(code):
+        """Remove markdown code fences like ```python, ```js, etc."""
+        import re
+        lines = code.split('\n')
+        # Strip opening fence (```python, ```javascript, ```html, ```, etc.)
+        if lines and re.match(r'^```\w*$', lines[0].strip()):
+            lines = lines[1:]
+        # Strip closing fence
+        if lines and lines[-1].strip() == '```':
+            lines = lines[:-1]
+        return '\n'.join(lines)
     
     def generate_stream(self, prompt):
         """Streaming code generation - yields chunks"""

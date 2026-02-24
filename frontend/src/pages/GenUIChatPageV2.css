@@ -1481,6 +1481,21 @@
   font-size: 0.9rem;
 }
 
+.agent-issues {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border-left: 2px solid var(--genui-primary);
+}
+
+.agent-issue-item {
+  font-size: 0.82rem !important;
+  color: var(--genui-text-3) !important;
+  margin: 4px 0 !important;
+  line-height: 1.4;
+}
+
 /* Fixes Panel */
 .fixes-panel {
   display: flex;
