@@ -17,6 +17,7 @@ import {
 import { useAGUIState, parseSSEData } from '../components/AGUIRenderer';
 import '../components/GenUIComponents.css';
 import TabbedCodeBlock from '../components/TabbedCodeBlock';
+import SetupGuide from '../components/SetupGuide';
 import './GenUIChatPageV2.css';
 
 const API_BASE = 'http://localhost:5000/api';
@@ -163,6 +164,7 @@ const GenUIChatPageV2 = () => {
       validation: workflowData.validation,
       tests: workflowData.tests,
       security: workflowData.security,
+      setup_guide: workflowData.setup_guide || null,
       stats: {
         totalDuration: restoredStats.totalDuration || restoredStats.total_duration || null,
         totalLines: restoredStats.totalLines || restoredStats.total_lines || 0,
@@ -347,6 +349,7 @@ const GenUIChatPageV2 = () => {
       let agentResults = {};
       let finalAllFixes = [];
       let localAgentMessages = []; // Track agent messages locally for saving
+      let setupGuideData = null; // Track setup guide for multi-file projects
       const startTime = Date.now(); // Track start time for duration calculation
 
       while (true) {
@@ -448,6 +451,11 @@ const GenUIChatPageV2 = () => {
               setAgentMessages(prev => [...prev, resultMsg]);
               break;
 
+            case 'setup_guide':
+              // Capture setup instructions for multi-file projects
+              setupGuideData = data.data || null;
+              break;
+
             case 'complete':
               // Merge backend all_fixes with locally collected fixes
               const backendFixes = data.payload?.all_fixes || [];
@@ -501,6 +509,7 @@ const GenUIChatPageV2 = () => {
         validation: agentResults.validator,
         tests: agentResults.testing || agentResults['testing agent'],
         security: agentResults.security || agentResults['security agent'],
+        setup_guide: setupGuideData,
         stats: {
           totalDuration: totalDuration,
           totalLines: fullCode.split('\n').length,
@@ -523,6 +532,7 @@ const GenUIChatPageV2 = () => {
           validation: savedResult.validation,
           tests: savedResult.tests,
           security: savedResult.security,
+          setup_guide: setupGuideData,
           stats: savedResult.stats,
           agent_messages: localAgentMessages.slice(-20)
         },
@@ -1026,6 +1036,11 @@ const GenUIChatPageV2 = () => {
                       </div>
                     ) : null;
                   })()}
+
+                  {/* Setup guide for multi-file projects */}
+                  {msg.role === 'assistant' && msg.hasResult && msg.workflow_data?.setup_guide && (
+                    <SetupGuide data={msg.workflow_data.setup_guide} />
+                  )}
                 </div>
               </motion.div>
             ))}

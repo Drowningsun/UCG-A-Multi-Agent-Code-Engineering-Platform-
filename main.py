@@ -492,6 +492,11 @@ Please modify or rewrite the above code according to the user's request."""
         yield f"data: {json.dumps(sec_result)}\n\n"
         yield f"data: {json.dumps({'type': 'workflow_update', 'steps': workflow_steps})}\n\n"
         
+        # ===== SETUP INSTRUCTIONS (for multi-file projects) =====
+        setup_guide = orchestrator.generate_setup_instructions(current_code)
+        if setup_guide:
+            yield f"data: {json.dumps({'type': 'setup_guide', 'data': setup_guide})}\n\n"
+        
         # ===== FINAL RESULT =====
         total_duration = time.time() - start_time
         total_fixes = sum(len(f['fixes']) for f in all_fixes)
@@ -523,6 +528,7 @@ Please modify or rewrite the above code according to the user's request."""
                 'original_code': original_code if code_was_fixed else None,
                 'prompt': request.prompt,
                 'all_fixes': all_fixes,
+                'setup_guide': setup_guide,
                 'total_fixes': total_fixes,
                 'code_was_fixed': code_was_fixed,
                 'workflow': workflow_steps,

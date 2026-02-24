@@ -245,6 +245,72 @@ class Orchestrator:
             "total_fixes": sum(len(f['fixes']) for f in self.all_fixes)
         }
 
+    def is_multi_file(self, code):
+        """Check if the generated code is a multi-file project"""
+        import re
+        markers = re.findall(r'<!--\s*.+?\.\w{1,5}\s*-->', code)
+        return len(markers) >= 2
+
+    def generate_setup_instructions(self, code):
+        """Generate setup instructions for multi-file projects using LLM"""
+        if not self.is_multi_file(code):
+            return None
+        
+        system_prompt = """You are a technical documentation expert. Given a multi-file project's source code, generate clear, beginner-friendly setup instructions.
+
+Respond in this EXACT JSON format (no markdown, just valid JSON):
+{
+    "project_structure": "A tree-format string showing the folder structure e.g. project/\\n├── src/\\n│   ├── index.js\\n│   └── App.js\\n├── package.json\\n└── README.md",
+    "prerequisites": ["Node.js v16+", "npm or yarn"],
+    "installation_steps": [
+        {"command": "npm install", "description": "Install all dependencies"}
+    ],
+    "env_setup": [
+        {"variable": "API_KEY", "description": "Your API key", "example": "API_KEY=your-key-here"}
+    ],
+    "database_setup": [
+        {"step": "Install MongoDB", "command": "brew install mongodb-community"}
+    ],
+    "run_commands": [
+        {"command": "npm start", "description": "Start development server", "type": "dev"},
+        {"command": "npm run build", "description": "Build for production", "type": "prod"}
+    ],
+    "how_it_works": "Brief explanation of the project architecture and flow",
+    "troubleshooting": [
+        {"problem": "Port 3000 already in use", "solution": "Kill the process using port 3000 or change the port in .env"}
+    ],
+    "vscode_tips": ["Open the project folder in VS Code", "Install recommended extensions"]
+}
+
+RULES:
+- Only include database_setup if the project uses a database
+- Only include env_setup if environment variables are needed
+- Detect the tech stack from the code (React, Express, Flask, Django, HTML/CSS/JS, etc.)
+- Keep instructions concise but technically accurate
+- Format terminal commands exactly as they should be run
+- Do NOT include markdown or code blocks — just pure JSON
+- Escape all quotes and newlines properly in JSON strings"""
+
+        user_prompt = f"Generate setup instructions for this multi-file project:\n\n{code[:6000]}"
+        
+        print(f"📋 Generating setup instructions for multi-file project...")
+        from agents.base import call_groq_api
+        result = call_groq_api(self.api_key or self.code_generator.api_key, system_prompt, user_prompt, max_tokens=2000)
+        
+        if result:
+            try:
+                import json
+                json_start = result.find('{')
+                json_end = result.rfind('}') + 1
+                if json_start != -1 and json_end > json_start:
+                    parsed = json.loads(result[json_start:json_end])
+                    print(f"✅ Setup instructions generated successfully")
+                    return parsed
+            except Exception as e:
+                print(f"⚠️ Failed to parse setup instructions: {e}")
+        
+        return None
+
     def get_agent_info(self):
         """Get information about all agents"""
         return {
