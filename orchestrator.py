@@ -295,7 +295,19 @@ RULES:
         
         print(f"📋 Generating setup instructions for multi-file project...")
         from agents.base import call_groq_api
-        result = call_groq_api(self.api_key or self.code_generator.api_key, system_prompt, user_prompt, max_tokens=2000)
+        import time as _time
+        
+        # Retry with delay to handle rate limits (429 errors)
+        max_retries = 3
+        result = None
+        for attempt in range(max_retries):
+            result = call_groq_api(self.api_key or self.code_generator.api_key, system_prompt, user_prompt, max_tokens=2000)
+            if result:
+                break
+            if attempt < max_retries - 1:
+                wait_secs = 10 * (attempt + 1)  # 10s, 20s, 30s
+                print(f"⏳ Rate limited — retrying setup instructions in {wait_secs}s (attempt {attempt + 2}/{max_retries})...")
+                _time.sleep(wait_secs)
         
         if result:
             try:
