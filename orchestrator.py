@@ -58,10 +58,14 @@ class Orchestrator:
             "agent_info": AGENT_INFO
         }
 
-    def generate_code_stream(self, prompt):
+    def classify_prompt(self, prompt):
+        """Classify whether prompt needs single-file or multi-file generation"""
+        return self.code_generator.classify_prompt(prompt)
+
+    def generate_code_stream(self, prompt, mode='multi'):
         """Stream code generation - yields chunks for real-time display"""
         self.memory['latest_prompt'] = prompt
-        for chunk in self.code_generator.generate_stream(prompt):
+        for chunk in self.code_generator.generate_stream(prompt, mode=mode):
             yield chunk
 
     def validate_code(self, code):

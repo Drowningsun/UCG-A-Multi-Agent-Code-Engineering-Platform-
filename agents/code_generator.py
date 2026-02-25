@@ -12,10 +12,33 @@ class CodeGeneratorAgent(BaseAgent):
         self.name = "Code Generator"
         self.description = "Generates clean, production-ready code from natural language prompts"
         
-        self.system_prompt = """You are an expert code generator that creates well-structured, production-ready projects.
+        self.classify_prompt_text = """You are a code request classifier. Given a user prompt, respond with ONLY the word "single" or "multi" (nothing else).
+
+Reply "single" if the request is for:
+- A single function, algorithm, class, or short program
+- A code snippet, utility, or script
+- Anything described as "simple", "basic", or "a program to..."
+- Examples: "write a C program to...", "implement binary search", "factorial using recursion", "create a Python function for..."
+
+Reply "multi" if the request is for:
+- A full app, project, website, system, dashboard, or platform
+- Anything requiring multiple components, pages, routes, or modules
+- Examples: "build a todo app", "create an e-commerce website", "make a chat application"
+"""
+
+        self.single_file_prompt = """You are an expert code generator. Generate a SINGLE clean, complete source file.
+
+RULES:
+1. Output ONLY raw source code — no markdown fences, no ```python, no ``` blocks.
+2. Do NOT use <!-- --> file markers. Just output the code directly.
+3. Use brief single-line comments only where needed. No docstrings, no triple-quote blocks.
+4. Include proper error handling and edge case coverage.
+5. Write clean, idiomatic code for the chosen language."""
+
+        self.multi_file_prompt = """You are an expert code generator that creates well-structured, production-ready projects.
 
 CRITICAL OUTPUT FORMAT RULES:
-1. For multi-file projects, prefix EACH file with a comment marker showing its path:
+1. Prefix EACH file with a comment marker showing its path:
    <!-- path/to/file.ext -->
    Use HTML comment markers <!-- --> for ALL file markers regardless of language.
 
@@ -24,9 +47,9 @@ CRITICAL OUTPUT FORMAT RULES:
    - React/JS: public/, src/components/, src/hooks/, src/styles/, src/utils/, tests/
    - Python/Flask: app/, app/routes/, app/models/, app/templates/, app/static/, tests/
    - Node/Express: src/routes/, src/middleware/, src/models/, src/controllers/, tests/
-   - HTML/CSS/JS (no framework): css/ (base.css, components.css, layout.css), js/ (app.js, ui.js, storage.js, utils.js), index.html
+   - HTML/CSS/JS (no framework): css/, js/, index.html
 
-3. MANDATORY FILE COUNT for apps/projects/systems: Generate a MINIMUM of 10 separate files. NEVER put everything in one monolithic file.
+3. MANDATORY: Generate a MINIMUM of 10 separate files. NEVER put everything in one monolithic file.
    Break features into individual files — one responsibility per file:
    - ONE file per UI component or page section
    - ONE file per data model or service
@@ -36,18 +59,23 @@ CRITICAL OUTPUT FORMAT RULES:
    - README.md with project overview and setup instructions
    - Config/dependency file (package.json, requirements.txt, etc.)
 
-4. SINGLE-FILE OUTPUT — use this when the request is for:
-   - A single function, algorithm, or short program (e.g. "write a C program to...", "write a Python function for...", "implement binary search", "factorial using recursion")
-   - A code snippet, utility, or script
-   - Any request that does NOT ask for an app, project, website, system, dashboard, or platform
-   For single-file output: just output the raw code with NO <!-- --> markers.
+4. Do NOT wrap code in markdown code blocks. Output raw code only.
+5. Each file should be complete, functional, and well-documented.
+6. Include proper error handling, input validation, and edge case handling.
+7. COMMENTS: Use ONLY brief single-line comments. No docstrings, no triple-quote blocks.
+8. NEVER include markdown language tags like ```python, ```javascript etc."""
 
-5. Do NOT wrap code in markdown code blocks (``` or ```python or ```js etc.). Output raw code only.
-6. Each file should be complete, functional, and well-documented with comments.
-7. Include proper error handling, input validation, and edge case handling.
-8. Write clean, idiomatic code following the conventions of the chosen language/framework.
-9. COMMENTS: Use ONLY brief single-line comments where necessary. NEVER add docstrings (no triple-quote blocks), NEVER add a comment to every line, NEVER add section header comments. Code should be self-documenting. Example of good commenting: one short comment per logical block, like "# Sort the array" — not a comment on every single line.
-10. NEVER include markdown language tags like ```python, ```javascript, ```html etc. in the output. Output ONLY raw source code."""
+        # Default system_prompt (for backward compat)
+        self.system_prompt = self.multi_file_prompt
+    
+    def classify_prompt(self, prompt):
+        """Quick LLM call to classify prompt as single-file or multi-file"""
+        result = self.call_api(self.classify_prompt_text, prompt, max_tokens=10)
+        if result:
+            classification = result.strip().lower().replace('"', '').replace("'", "")
+            if 'single' in classification:
+                return 'single'
+        return 'multi'
         
     def generate(self, prompt):
         """Non-streaming code generation"""
@@ -70,8 +98,10 @@ CRITICAL OUTPUT FORMAT RULES:
             lines = lines[:-1]
         return '\n'.join(lines)
     
-    def generate_stream(self, prompt):
+    def generate_stream(self, prompt, mode='multi'):
         """Streaming code generation - yields chunks"""
+        # Use the appropriate prompt based on classification
+        active_prompt = self.single_file_prompt if mode == 'single' else self.multi_file_prompt
         try:
             response = requests.post(
                 GROQ_BASE_URL,
@@ -82,7 +112,7 @@ CRITICAL OUTPUT FORMAT RULES:
                 json={
                     "model": MODEL,
                     "messages": [
-                        {"role": "system", "content": self.system_prompt},
+                        {"role": "system", "content": active_prompt},
                         {"role": "user", "content": prompt}
                     ],
                     "temperature": 0.7,

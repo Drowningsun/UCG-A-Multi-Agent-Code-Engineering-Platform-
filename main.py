@@ -170,8 +170,13 @@ Please modify or rewrite the above code according to the user's request."""
         
         fence_stripped = False  # Track if we already stripped opening fence
         
+        # Classify prompt as single-file or multi-file BEFORE generating
+        code_mode = orchestrator.classify_prompt(enhanced_prompt)
+        print(f"📋 Prompt classified as: {code_mode}")
+        yield f"data: {json.dumps({'type': 'classification', 'mode': code_mode})}\n\n"
+        
         # Use enhanced_prompt that includes context if available
-        for chunk in orchestrator.generate_code_stream(enhanced_prompt):
+        for chunk in orchestrator.generate_code_stream(enhanced_prompt, mode=code_mode):
             full_code += chunk
             
             # Strip opening markdown fence from very first chunk (e.g. ```python\n)
