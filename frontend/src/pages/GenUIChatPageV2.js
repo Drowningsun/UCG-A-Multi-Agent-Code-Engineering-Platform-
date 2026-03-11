@@ -566,6 +566,7 @@ const GenUIChatPageV2 = () => {
               validation: savedResult.validation,
               tests: savedResult.tests,
               security: savedResult.security,
+              setup_guide: setupGuideData,
               stats: statsToSave,
               agent_messages: localAgentMessages.slice(-20) // Save last 20 agent messages
             }

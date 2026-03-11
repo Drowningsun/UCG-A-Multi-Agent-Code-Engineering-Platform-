@@ -31,7 +31,7 @@ class Settings:
     # AI Model Configuration
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     MISTRAL_MODEL: str = "mistral-large-latest"
-    QWEN_MODEL: str = "qwen-plus"
+    QWEN_MODEL: str = " "
     
     @classmethod
     def get_api_key(cls, provider: str) -> str:
