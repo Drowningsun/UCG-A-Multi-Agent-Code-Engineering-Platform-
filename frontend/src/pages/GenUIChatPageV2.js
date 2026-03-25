@@ -74,6 +74,13 @@ const GenUIChatPageV2 = () => {
   // Completion celebration
   const [showCompletion, setShowCompletion] = useState(false);
 
+  // AI-generated project name for zip downloads (set once on first prompt)
+  const [projectName, setProjectName] = useState('');
+  // Version number: increments on each new code generation
+  const [codeVersion, setCodeVersion] = useState(0);
+  // Version displayed in right panel (matches the selected result card)
+  const [displayVersion, setDisplayVersion] = useState(1);
+
   // Refs
   const messagesEndRef = useRef(null);
   const sessionCreatedRef = useRef(false);
@@ -165,6 +172,7 @@ const GenUIChatPageV2 = () => {
       tests: workflowData.tests,
       security: workflowData.security,
       setup_guide: workflowData.setup_guide || null,
+      version: workflowData.version || 1,
       stats: {
         totalDuration: restoredStats.totalDuration || restoredStats.total_duration || null,
         totalLines: restoredStats.totalLines || restoredStats.total_lines || 0,
@@ -181,6 +189,10 @@ const GenUIChatPageV2 = () => {
     setSelectedMessageIndex(index);
     const builtResult = buildResultFromMessage(msg);
     setResult(builtResult);
+    // Show the version that belongs to this specific result card
+    if (msg.workflow_data?.version) {
+      setDisplayVersion(msg.workflow_data.version);
+    }
     setShowOriginal(false);
     setShowRightPanel(true);
     setRightPanelTab('code');
@@ -196,6 +208,10 @@ const GenUIChatPageV2 = () => {
     try {
       const response = await authAxios.get(`/sessions/${sessionId}`);
       setSessionTitle(response.data.title || 'New Chat');
+      // Restore project name from DB
+      if (response.data.project_name) {
+        setProjectName(response.data.project_name);
+      }
       if (response.data.messages?.length > 0) {
         const loadedMessages = response.data.messages.map(msg => ({
           role: msg.role,
@@ -212,7 +228,11 @@ const GenUIChatPageV2 = () => {
           const lastMsg = loadedMessages[lastAssistantIndex];
           setSelectedMessageIndex(lastAssistantIndex);
           setResult(buildResultFromMessage(lastMsg));
-
+          // Restore displayVersion from stored version
+          if (lastMsg.workflow_data?.version) {
+            setDisplayVersion(lastMsg.workflow_data.version);
+            setCodeVersion(lastMsg.workflow_data.version);
+          }
           // Restore agent messages if available
           if (lastMsg.workflow_data?.agent_messages) {
             setAgentMessages(lastMsg.workflow_data.agent_messages);
@@ -282,6 +302,8 @@ const GenUIChatPageV2 = () => {
       setPrompt('');
       setResult(null);
       setStreamingCode('');
+      setProjectName('');
+      setCodeVersion(0);
       resetAGUI();
       sessionCreatedRef.current = true;
       navigate(`/chat/${newSessionId}`);
@@ -328,6 +350,33 @@ const GenUIChatPageV2 = () => {
     setShowRightPanel(true);
     setRightPanelTab('code');
     resetAGUI();
+
+    // Increment version on each new generation, and sync displayVersion
+    const nextVersion = codeVersion + 1;
+    setCodeVersion(nextVersion);
+    setDisplayVersion(nextVersion);
+
+    // Generate AI project name on first prompt (don't await — fire and forget)
+    if (!projectName) {
+      fetch(`${API_BASE}/generate-project-name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.project_name) {
+            setProjectName(data.project_name);
+            // Persist the base project name to the session in MongoDB
+            if (sessionId && token) {
+              authAxios.patch(`/sessions/${sessionId}/project-name`, {
+                project_name: data.project_name
+              }).catch(err => console.error('Failed to save project name:', err));
+            }
+          }
+        })
+        .catch(err => console.error('Project name generation failed:', err));
+    }
 
     try {
       // Include context_code if we have previously generated code
@@ -534,6 +583,7 @@ const GenUIChatPageV2 = () => {
           security: savedResult.security,
           setup_guide: setupGuideData,
           stats: savedResult.stats,
+          version: nextVersion,
           agent_messages: localAgentMessages.slice(-20)
         },
         hasResult: true
@@ -568,7 +618,8 @@ const GenUIChatPageV2 = () => {
               security: savedResult.security,
               setup_guide: setupGuideData,
               stats: statsToSave,
-              agent_messages: localAgentMessages.slice(-20) // Save last 20 agent messages
+              version: nextVersion,
+              agent_messages: localAgentMessages.slice(-20)
             }
           });
         } catch (error) {
@@ -1174,6 +1225,8 @@ const GenUIChatPageV2 = () => {
                       <TabbedCodeBlock
                         code={showOriginal ? result?.original_code : (result?.code || streamingCode)}
                         maxHeight="calc(100vh - 250px)"
+                        projectName={projectName}
+                        version={displayVersion}
                       />
                       {loading && <span className="streaming-cursor" />}
                     </div>

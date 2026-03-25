@@ -268,6 +268,15 @@ class SessionDB:
             {"_id": ObjectId(session_id)},
             {"$set": {"title": title, "updated_at": datetime.utcnow()}}
         )
+
+    @staticmethod
+    async def update_session_project_name(session_id: str, project_name: str):
+        """Save the AI-generated project base name (e.g. 'todo-app') to the session"""
+        db = get_database()
+        await db.sessions.update_one(
+            {"_id": ObjectId(session_id)},
+            {"$set": {"project_name": project_name, "updated_at": datetime.utcnow()}}
+        )
     
     @staticmethod
     async def delete_session(session_id: str):

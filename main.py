@@ -708,6 +708,7 @@ async def get_session(session_id: str, user: dict = Depends(get_current_user)):
     return {
         "session_id": session["_id"],
         "title": session.get("title", "New Chat"),
+        "project_name": session.get("project_name", ""),
         "created_at": session["created_at"].isoformat(),
         "messages": [{
             "id": msg["_id"],
@@ -815,6 +816,29 @@ async def update_session_title_endpoint(
     return {"message": "Title updated", "title": title}
 
 
+class ProjectNameUpdateRequest(BaseModel):
+    project_name: str
+
+
+@app.patch("/api/sessions/{session_id}/project-name")
+async def update_session_project_name_endpoint(
+    session_id: str,
+    request: ProjectNameUpdateRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Save the AI-generated project base name to a session"""
+    session = await SessionDB.get_session(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session["user_id"] != user["_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    await SessionDB.update_session_project_name(session_id, request.project_name)
+    return {"message": "Project name updated", "project_name": request.project_name}
+
+
 class BulkDeleteRequest(BaseModel):
     session_ids: List[str]
 
@@ -855,6 +879,66 @@ async def cleanup_empty_sessions(user: dict = Depends(get_current_user)):
                 print(f"Error cleaning up session {session['_id']}: {e}")
     
     return {"message": f"Cleaned up {deleted_count} empty sessions", "deleted_count": deleted_count}
+
+class ProjectNameRequest(BaseModel):
+    prompt: str
+
+
+@app.post("/api/generate-project-name")
+async def generate_project_name(request: ProjectNameRequest):
+    """Generate a compact, kebab-case project name from a user prompt using AI"""
+    import httpx
+
+    prompt_text = request.prompt.strip()
+    if not prompt_text:
+        return {"project_name": "generated-code"}
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "Generate a very short project name (2-3 words max) in kebab-case (lowercase, hyphen-separated) "
+                                "for a coding project based on the user's request. "
+                                "Examples: 'api-retry-handler', 'auth-system', 'rate-limiter', 'todo-app', 'db-pool-manager'. "
+                                "Return ONLY the kebab-case name, nothing else. No quotes, no explanation."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": f"User's request: {prompt_text[:500]}"
+                        }
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 20
+                }
+            )
+
+            response.raise_for_status()  # Raise on 4xx/5xx so the except block catches it with a real message
+            data = response.json()
+            name = data["choices"][0]["message"]["content"].strip().strip('"').strip("'").strip()
+            # Sanitize: ensure kebab-case, no special chars
+            name = re.sub(r'[^a-z0-9\-]', '', name.lower().replace(' ', '-'))
+            name = re.sub(r'-+', '-', name).strip('-')
+            if name:
+                return {"project_name": name[:40]}
+    except Exception as e:
+        print(f"Error generating project name ({type(e).__name__}): {repr(e)}")
+
+    # Fallback: extract keywords
+    words = re.sub(r'[^a-z0-9\s]', '', prompt_text.lower()).split()
+    stop = {'a','an','the','and','or','to','for','of','with','in','on','is','create','build','write','generate','make','using','use','code','function','class','please'}
+    keywords = [w for w in words if w not in stop and len(w) > 1][:3]
+    return {"project_name": "-".join(keywords) if keywords else "generated-code"}
 
 
 # Run with: python main.py
