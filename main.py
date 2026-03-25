@@ -708,6 +708,7 @@ async def get_session(session_id: str, user: dict = Depends(get_current_user)):
     return {
         "session_id": session["_id"],
         "title": session.get("title", "New Chat"),
+        "project_name": session.get("project_name", ""),
         "created_at": session["created_at"].isoformat(),
         "messages": [{
             "id": msg["_id"],
@@ -815,6 +816,29 @@ async def update_session_title_endpoint(
     return {"message": "Title updated", "title": title}
 
 
+class ProjectNameUpdateRequest(BaseModel):
+    project_name: str
+
+
+@app.patch("/api/sessions/{session_id}/project-name")
+async def update_session_project_name_endpoint(
+    session_id: str,
+    request: ProjectNameUpdateRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Save the AI-generated project base name to a session"""
+    session = await SessionDB.get_session(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session["user_id"] != user["_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    await SessionDB.update_session_project_name(session_id, request.project_name)
+    return {"message": "Project name updated", "project_name": request.project_name}
+
+
 class BulkDeleteRequest(BaseModel):
     session_ids: List[str]
 
@@ -899,16 +923,16 @@ async def generate_project_name(request: ProjectNameRequest):
                 }
             )
 
-            if response.status_code == 200:
-                data = response.json()
-                name = data["choices"][0]["message"]["content"].strip().strip('"').strip("'").strip()
-                # Sanitize: ensure kebab-case, no special chars
-                name = re.sub(r'[^a-z0-9\-]', '', name.lower().replace(' ', '-'))
-                name = re.sub(r'-+', '-', name).strip('-')
-                if name:
-                    return {"project_name": name[:40]}
+            response.raise_for_status()  # Raise on 4xx/5xx so the except block catches it with a real message
+            data = response.json()
+            name = data["choices"][0]["message"]["content"].strip().strip('"').strip("'").strip()
+            # Sanitize: ensure kebab-case, no special chars
+            name = re.sub(r'[^a-z0-9\-]', '', name.lower().replace(' ', '-'))
+            name = re.sub(r'-+', '-', name).strip('-')
+            if name:
+                return {"project_name": name[:40]}
     except Exception as e:
-        print(f"Error generating project name: {e}")
+        print(f"Error generating project name ({type(e).__name__}): {repr(e)}")
 
     # Fallback: extract keywords
     words = re.sub(r'[^a-z0-9\s]', '', prompt_text.lower()).split()
