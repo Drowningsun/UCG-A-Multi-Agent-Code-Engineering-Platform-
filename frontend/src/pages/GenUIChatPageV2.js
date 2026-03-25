@@ -699,98 +699,163 @@ const GenUIChatPageV2 = () => {
     setEditingContent('');
   };
 
-  // Generate a rich description for the code (ChatGPT style)
+  // Generate a rich description for the code — language-aware (Python + JS/React)
   const generateDescription = (code, prompt) => {
     if (!code) return null;
 
     const lines = code.split('\n').length;
-    const hasClass = code.includes('class ');
-    const hasAsync = code.includes('async ');
-    const imports = code.match(/^import |^from /gm)?.length || 0;
+    const promptLower = prompt?.toLowerCase() || '';
+    const cleanPrompt = promptLower.replace(/\b(create|build|write|generate|make|add|simple|basic|a|an|the|me|please|hey|just)\b/gi, '').trim();
 
-    // Extract function/class names
-    const classMatch = code.match(/class\s+(\w+)/g)?.map(c => c.replace('class ', '')) || [];
-    const funcMatch = code.match(/def\s+(\w+)/g)?.map(f => f.replace('def ', '')).filter(f => !f.startsWith('_')) || [];
+    // ── Language detection ─────────────────────────────────────────
+    const isReact = code.includes("from 'react'") || code.includes('useState') || code.includes('useEffect') || code.includes('import React');
+    const isJS = !isReact && (code.includes('export default') || code.includes('export const') || code.includes('const ') || code.includes('function '));
+
+    let desc = { title: '', summary: '', keyPoints: [], features: [], structure: '' };
+
+    // ── Prompt-based title (works for all languages) ───────────────
+    if (promptLower.includes('auth') || promptLower.includes('login')) desc.title = '🔐 Authentication System';
+    else if (promptLower.includes('landing')) desc.title = '🌟 Landing Page';
+    else if (promptLower.includes('dashboard')) desc.title = '📊 Dashboard';
+    else if (promptLower.includes('todo') || promptLower.includes('task')) desc.title = '✅ Todo Application';
+    else if (promptLower.includes('chat') || promptLower.includes('message')) desc.title = '💬 Chat Interface';
+    else if (promptLower.includes('api') || promptLower.includes('fetch')) desc.title = '🌐 API Integration';
+    else if (promptLower.includes('database') || promptLower.includes(' db ')) desc.title = '🗄️ Database Handler';
+    else if (promptLower.includes('rate limit')) desc.title = '⏱️ Rate Limiter';
+    else if (promptLower.includes('cache')) desc.title = '💾 Caching System';
+    else if (promptLower.includes('test')) desc.title = '🧪 Testing Utilities';
+    else if (promptLower.includes('calculator') || promptLower.includes('calc')) desc.title = '🧮 Calculator App';
+
+    // ══════════════════════════════════════════════════════════════
+    // ── JS / REACT branch ─────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    if (isReact || isJS) {
+      // Title fallback
+      if (!desc.title) {
+        if (isReact) desc.title = '⚛️ React Application';
+        else desc.title = '⚡ JavaScript Module';
+      }
+
+      // Component names (PascalCase)
+      const components = [...new Set([
+        ...(code.match(/export\s+default\s+(?:function\s+)?([A-Z]\w+)/g) || []).map(m => m.replace(/export\s+default\s+(?:function\s+)?/, '')),
+        ...(code.match(/(?:function|const)\s+([A-Z]\w+)\s*[=(]/g) || []).map(m => m.replace(/(?:function|const)\s+/, '').replace(/\s*[=(].*/, '')),
+      ])].filter(c => c.length > 1 && c !== 'React');
+
+      // Override title with primary component if more specific
+      if (components.length > 0 && desc.title === '⚛️ React Application') {
+        desc.title = `⚛️ ${components[0]} App`;
+      }
+
+      // Regular JS functions (camelCase)
+      const jsFuncs = [...new Set(
+        (code.match(/(?:function|const)\s+([a-z]\w+)\s*[=(]/g) || []).map(m => m.replace(/(?:function|const)\s+/, '').replace(/\s*[=(].*/, ''))
+      )].filter(f => f.length > 2 && !['true', 'false', 'null', 'let', 'var', 'async'].includes(f));
+
+      // React hooks used
+      const hooks = [...new Set((code.match(/\buse[A-Z]\w+/g) || []))];
+
+      // Import count
+      const jsImports = (code.match(/^import\s/gm) || []).length;
+
+      // File count (multi-file marker)
+      const fileCount = (code.match(/={3,}\s+[\w./]+\s+={3,}/g) || []).length;
+
+      // Summary
+      if (components.length > 0) {
+        desc.summary = `I've built **${components[0]}**${components.length > 1 ? ` along with ${components.length - 1} other component${components.length > 2 ? 's' : ''}` : ''} that ${cleanPrompt || 'implements the requested functionality'}. The code follows modern React best practices and is production-ready.`;
+      } else if (jsFuncs.length > 0) {
+        desc.summary = `I've implemented **${jsFuncs[0]}**${jsFuncs.length > 1 ? ` and ${jsFuncs.length - 1} other function${jsFuncs.length > 2 ? 's' : ''}` : ''} to ${cleanPrompt || 'handle the requested logic'}. Clean, modular, and well-structured JavaScript.`;
+      } else {
+        desc.summary = `Here's a ${isReact ? 'React' : 'JavaScript'} implementation that ${cleanPrompt || 'addresses your requirements'}. Structured for maintainability with modern best practices.`;
+      }
+
+      // Key components
+      components.slice(0, 4).forEach(c => {
+        const role = /[Pp]age/.test(c) ? 'Full page view' : /[Ff]orm/.test(c) ? 'Handles user input' : /[Ll]ist/.test(c) ? 'Renders item collection' : /[Ii]tem/.test(c) ? 'Individual item display' : /[Nn]av/.test(c) ? 'Navigation bar' : /[Mm]odal/.test(c) ? 'Overlay dialog' : /[Hh]eader/.test(c) ? 'Page header' : /[Ff]ooter/.test(c) ? 'Page footer' : /[Ss]idebar/.test(c) ? 'Side panel' : /[Cc]ard/.test(c) ? 'Card display' : /[Aa]pp/.test(c) ? 'Root application' : 'React component';
+        desc.keyPoints.push(`**${c}** - ${role}`);
+      });
+      jsFuncs.slice(0, Math.max(0, 4 - components.length)).forEach(f => {
+        const role = /fetch|load|get/.test(f) ? 'Fetches / loads data' : /handle|on[A-Z]/.test(f) ? 'Event handler' : /format|parse|convert/.test(f) ? 'Data transformation' : /validate|check/.test(f) ? 'Input validation' : /save|store|persist/.test(f) ? 'Persists data' : /render/.test(f) ? 'Renders UI' : 'Helper function';
+        desc.keyPoints.push(`\`${f}()\` - ${role}`);
+      });
+
+      // React/JS features
+      if (hooks.includes('useState')) desc.features.push('**State management** with React hooks');
+      if (hooks.includes('useEffect')) desc.features.push('**Side effects** handled via useEffect');
+      if (hooks.includes('useContext') || code.includes('createContext')) desc.features.push('**Context API** for global state');
+      if (hooks.includes('useCallback') || hooks.includes('useMemo')) desc.features.push('**Performance optimised** with memoization');
+      if (hooks.includes('useRef')) desc.features.push('**DOM refs** for element access');
+      if (code.includes('fetch(') || code.includes('axios')) desc.features.push('**API calls** with async data fetching');
+      if (code.includes('async ') && code.includes('await ')) desc.features.push('**Async/await** for non-blocking operations');
+      if (code.includes('try') && code.includes('catch')) desc.features.push('**Error handling** with try/catch');
+      if (code.includes('localStorage') || code.includes('sessionStorage')) desc.features.push('**Persistent storage** via localStorage');
+      if (code.includes('useNavigate') || code.includes('BrowserRouter') || code.includes('<Route')) desc.features.push('**Client-side routing** with React Router');
+      if (code.includes('@media') || code.includes('responsive')) desc.features.push('**Responsive design** for all screens');
+      if (code.includes('animation') || code.includes('transition') || code.includes('framer')) desc.features.push('**Smooth animations** for polished UX');
+      if (code.includes('.test.') || code.includes('describe(') || code.includes('it(')) desc.features.push('**Unit tests** included');
+      if (code.includes('PropTypes') || code.includes(': Props')) desc.features.push('**Typed props** for component contracts');
+
+      // Structure
+      desc.structure = `${lines} lines • ${jsImports} import${jsImports !== 1 ? 's' : ''}${components.length ? ` • ${components.length} component${components.length > 1 ? 's' : ''}` : ''}${hooks.length ? ` • ${hooks.length} hook${hooks.length > 1 ? 's' : ''}` : ''}${fileCount > 1 ? ` • ${fileCount} files` : ''}`;
+      return desc;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ── PYTHON branch ─────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    const pyImports   = (code.match(/^(?:import |from )/gm) || []).length;
+    const classMatch  = [...new Set((code.match(/class\s+(\w+)/g) || []).map(c => c.replace('class ', '')))];
+    const funcMatch   = [...new Set((code.match(/def\s+(\w+)/g) || []).map(f => f.replace('def ', '')).filter(f => !f.startsWith('_')))];
     const publicMethods = funcMatch.filter(f => !f.startsWith('__'));
 
-    // Detect patterns
-    const hasErrorHandling = code.includes('try:') || code.includes('except');
-    const hasLogging = code.includes('logging') || code.includes('logger');
-    const hasTypeHints = code.includes(': str') || code.includes(': int') || code.includes('-> ');
+    const hasAsync      = code.includes('async ');
+    const hasErrorH     = code.includes('try:') || code.includes('except');
+    const hasLogging    = code.includes('logging') || code.includes('logger');
+    const hasTypeHints  = code.includes(': str') || code.includes(': int') || code.includes('-> ');
     const hasDocstrings = code.includes('"""') || code.includes("'''");
     const hasDecorators = (code.match(/@\w+/g) || []).length > 0;
-    const hasDataclass = code.includes('@dataclass');
+    const hasDataclass  = code.includes('@dataclass');
     const hasValidation = code.includes('raise ') || code.includes('ValueError') || code.includes('assert');
 
-    // Build description
-    let desc = {
-      title: '',
-      summary: '',
-      keyPoints: [],
-      features: [],
-      structure: ''
-    };
-
-    // Generate title based on what was requested
-    const promptLower = prompt?.toLowerCase() || '';
-    if (promptLower.includes('auth')) {
-      desc.title = '🔐 Authentication Module';
-    } else if (promptLower.includes('api') || promptLower.includes('fetch')) {
-      desc.title = '🌐 API Integration';
-    } else if (promptLower.includes('database') || promptLower.includes('db')) {
-      desc.title = '🗄️ Database Handler';
-    } else if (promptLower.includes('rate limit')) {
-      desc.title = '⏱️ Rate Limiter';
-    } else if (promptLower.includes('cache')) {
-      desc.title = '💾 Caching System';
-    } else if (promptLower.includes('test')) {
-      desc.title = '🧪 Testing Utilities';
-    } else if (hasClass && classMatch.length > 0) {
-      desc.title = `📦 ${classMatch[0]} Class`;
-    } else if (publicMethods.length > 0) {
-      desc.title = `⚡ ${publicMethods[0]} Function`;
-    } else {
-      desc.title = '✨ Generated Code';
+    // Title fallback
+    if (!desc.title) {
+      if (classMatch.length > 0) desc.title = `📦 ${classMatch[0]} Class`;
+      else if (publicMethods.length > 0) desc.title = `⚡ ${publicMethods[0]} Function`;
+      else desc.title = '✨ Generated Code';
     }
 
-    // Generate summary
-    if (hasClass && classMatch.length > 0) {
-      const className = classMatch[0];
+    // Summary
+    if (classMatch.length > 0) {
       const methodCount = publicMethods.length;
-      desc.summary = `I've created a **${className}** class with ${methodCount} method${methodCount !== 1 ? 's' : ''} that implements ${promptLower.includes('auth') ? 'secure authentication logic' : promptLower.includes('api') ? 'robust API communication' : promptLower.includes('pool') ? 'connection pooling' : 'the requested functionality'}. The code follows Python best practices and includes proper error handling.`;
+      desc.summary = `I've created a **${classMatch[0]}** class with ${methodCount} method${methodCount !== 1 ? 's' : ''} that ${cleanPrompt || 'implements the requested functionality'}. The code follows Python best practices and includes proper error handling.`;
     } else if (publicMethods.length > 0) {
-      desc.summary = `I've implemented a **${publicMethods[0]}** function${publicMethods.length > 1 ? ` along with ${publicMethods.length - 1} helper function${publicMethods.length > 2 ? 's' : ''}` : ''} that ${promptLower.replace(/create|build|write|generate|a |an /gi, '').trim() || 'performs the requested operation'}. The implementation is production-ready with comprehensive error handling.`;
+      desc.summary = `I've implemented **${publicMethods[0]}**${publicMethods.length > 1 ? ` along with ${publicMethods.length - 1} helper function${publicMethods.length > 2 ? 's' : ''}` : ''} that ${cleanPrompt || 'performs the requested operation'}. Production-ready with comprehensive error handling.`;
     } else {
-      desc.summary = `Here's a Python implementation that ${promptLower.replace(/create|build|write|generate|a |an /gi, '').trim() || 'addresses your requirements'}. The code is structured for maintainability and follows best practices.`;
+      desc.summary = `Here's a Python implementation that ${cleanPrompt || 'addresses your requirements'}. Structured for maintainability following best practices.`;
     }
 
-    // Key implementation points
-    if (hasClass && classMatch.length > 0) {
-      desc.keyPoints.push(`**${classMatch[0]}** - Main class encapsulating the logic`);
-    }
-    if (publicMethods.length > 0) {
-      const mainMethods = publicMethods.slice(0, 3);
-      mainMethods.forEach(m => {
-        desc.keyPoints.push(`\`${m}()\` - ${m.includes('init') ? 'Initializes the instance' : m.includes('get') ? 'Retrieves data' : m.includes('set') ? 'Updates configuration' : m.includes('validate') ? 'Validates input' : m.includes('create') ? 'Creates new resource' : m.includes('delete') ? 'Removes resource' : m.includes('update') ? 'Updates existing data' : 'Core functionality'}`);
-      });
-    }
+    // Key points
+    classMatch.slice(0, 2).forEach(c => desc.keyPoints.push(`**${c}** - Main class encapsulating the logic`));
+    publicMethods.slice(0, Math.max(0, 4 - classMatch.length)).forEach(m => {
+      const role = m.includes('init') ? 'Initializes instance' : m.includes('get') ? 'Retrieves data' : m.includes('set') ? 'Updates configuration' : m.includes('validate') ? 'Validates input' : m.includes('create') ? 'Creates new resource' : m.includes('delete') ? 'Removes resource' : m.includes('update') ? 'Updates data' : m.includes('parse') ? 'Parses input' : 'Core functionality';
+      desc.keyPoints.push(`\`${m}()\` - ${role}`);
+    });
 
-    // Features detected
-    if (hasAsync) desc.features.push('**Async/await** for non-blocking I/O operations');
-    if (hasErrorHandling) desc.features.push('**Exception handling** with proper error recovery');
-    if (hasTypeHints) desc.features.push('**Type hints** for better IDE support and documentation');
-    if (hasDocstrings) desc.features.push('**Docstrings** explaining function behavior');
-    if (hasLogging) desc.features.push('**Logging** for debugging and monitoring');
+    // Features
+    if (hasAsync)      desc.features.push('**Async/await** for non-blocking I/O operations');
+    if (hasErrorH)     desc.features.push('**Exception handling** with proper error recovery');
+    if (hasTypeHints)  desc.features.push('**Type hints** for better IDE support and documentation');
+    if (hasDocstrings) desc.features.push('**Docstrings** explaining function behaviour');
+    if (hasLogging)    desc.features.push('**Logging** for debugging and monitoring');
     if (hasDecorators) desc.features.push('**Decorators** for clean, reusable patterns');
     if (hasValidation) desc.features.push('**Input validation** preventing bad data');
-    if (hasDataclass) desc.features.push('**Dataclasses** for clean data structures');
+    if (hasDataclass)  desc.features.push('**Dataclasses** for clean data structures');
     if (code.includes('hashlib') || code.includes('bcrypt')) desc.features.push('**Secure hashing** for sensitive data');
     if (code.includes('retry') || code.includes('backoff')) desc.features.push('**Retry logic** with exponential backoff');
     if (code.includes('threading') || code.includes('asyncio')) desc.features.push('**Concurrency** support built-in');
 
-    // Structure info
-    desc.structure = `${lines} lines • ${imports} import${imports !== 1 ? 's' : ''}${classMatch.length ? ` • ${classMatch.length} class${classMatch.length > 1 ? 'es' : ''}` : ''}${publicMethods.length ? ` • ${publicMethods.length} function${publicMethods.length > 1 ? 's' : ''}` : ''}`;
-
+    desc.structure = `${lines} lines • ${pyImports} import${pyImports !== 1 ? 's' : ''}${classMatch.length ? ` • ${classMatch.length} class${classMatch.length > 1 ? 'es' : ''}` : ''}${publicMethods.length ? ` • ${publicMethods.length} function${publicMethods.length > 1 ? 's' : ''}` : ''}`;
     return desc;
   };
 
