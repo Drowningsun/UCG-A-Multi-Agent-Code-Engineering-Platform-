@@ -1,0 +1,377 @@
+/* ===== Project Viewer — Split-Panel Layout ===== */
+
+.project-viewer {
+    display: flex;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #1e1e2e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    height: 100%;
+    min-height: 400px;
+}
+
+/* ========== LEFT SIDEBAR ========== */
+.pv-sidebar {
+    width: 220px;
+    min-width: 180px;
+    max-width: 260px;
+    background: #11111b;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.pv-sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+}
+
+.pv-project-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.pv-project-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pv-project-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pv-project-meta {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* Tree Container */
+.pv-tree-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 0;
+}
+
+.pv-tree-container::-webkit-scrollbar {
+    width: 4px;
+}
+
+.pv-tree-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+/* Tree Folders */
+.tree-folder-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.65);
+    transition: background 0.1s ease;
+    user-select: none;
+}
+
+.tree-folder-header:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.tree-arrow {
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.3);
+    transition: transform 0.15s ease;
+    width: 12px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.tree-arrow.open {
+    transform: rotate(90deg);
+}
+
+.tree-folder-icon {
+    font-size: 13px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.tree-folder-name {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+/* Tree Files */
+.tree-file {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.55);
+    transition: all 0.1s ease;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+.tree-file:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.tree-file.active {
+    background: rgba(249, 115, 22, 0.08);
+    color: #f97316;
+}
+
+.tree-file-icon {
+    font-size: 13px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.tree-file-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 400;
+}
+
+.tree-file.active .tree-file-name {
+    font-weight: 500;
+}
+
+.tree-file-lines {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.2);
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 4px;
+}
+
+.tree-file.active .tree-file-lines {
+    color: rgba(249, 115, 22, 0.5);
+}
+
+
+/* ========== RIGHT PANEL ========== */
+.pv-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Header — file name + actions (Copy / Download ZIP) */
+.pv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #181825;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    gap: 8px;
+    min-height: 42px;
+    flex-wrap: wrap;
+}
+
+.pv-file-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 60px;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.pv-active-icon {
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.pv-active-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pv-active-lines {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.pv-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.pv-action-btn {
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.pv-action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.pv-download-btn {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(234, 88, 12, 0.08));
+    border-color: rgba(249, 115, 22, 0.25);
+    color: #fb923c;
+}
+
+.pv-download-btn:hover {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.22), rgba(234, 88, 12, 0.15));
+    border-color: rgba(249, 115, 22, 0.4);
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.12);
+    color: #fb923c;
+}
+
+.pv-download-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Tab Bar — sits BELOW the header, separate row */
+.pv-tabs {
+    display: flex;
+    align-items: center;
+    background: #16161e;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    overflow-x: auto;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.pv-tabs::-webkit-scrollbar {
+    height: 2px;
+}
+
+.pv-tabs::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.pv-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12.5px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s ease;
+    flex-shrink: 0;
+}
+
+.pv-tab:hover {
+    color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.pv-tab.active {
+    color: #e2e8f0;
+    background: #1e1e2e;
+    border-bottom-color: #f97316;
+}
+
+.pv-tab-icon {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.pv-tab-name {
+    font-weight: 500;
+}
+
+/* Code Area */
+.pv-code {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+}
+
+.pv-code .genui-code-block {
+    border-radius: 0;
+    border: none;
+    margin: 0;
+}
+
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+    .project-viewer {
+        flex-direction: column;
+    }
+
+    .pv-sidebar {
+        width: 100%;
+        max-width: 100%;
+        max-height: 180px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .pv-tab {
+        padding: 7px 12px;
+        font-size: 12px;
+    }
+
+    .pv-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 6px 10px;
+    }
+
+    .pv-header-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}

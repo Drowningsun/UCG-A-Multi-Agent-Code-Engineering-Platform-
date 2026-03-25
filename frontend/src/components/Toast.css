@@ -1,0 +1,127 @@
+/* Toast Container - Grok Style */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+/* Individual Toast - Grok Style */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--dark-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  border-left: 4px solid var(--primary);
+  min-width: 300px;
+  max-width: 450px;
+  animation: slideIn 0.3s ease;
+  pointer-events: auto;
+}
+
+.toast-exit {
+  animation: slideOut 0.3s ease forwards;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Toast Types - Grok Style */
+.toast-success {
+  border-left-color: var(--success);
+}
+
+.toast-error {
+  border-left-color: #ef4444;
+}
+
+.toast-info {
+  border-left-color: var(--primary);
+}
+
+.toast-welcome {
+  border-left-color: var(--primary);
+}
+
+/* Toast Icon */
+.toast-icon {
+  font-size: 1.3rem;
+}
+
+/* Toast Message */
+.toast-message {
+  flex: 1;
+  color: var(--white);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+/* Toast Close Button */
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.toast-close:hover {
+  color: var(--white);
+}
+
+/* Toast Progress Bar */
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 0 0 0 12px;
+  animation: progress 4s linear forwards;
+}
+
+@keyframes progress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .toast-container {
+    left: 20px;
+    right: 20px;
+  }
+  
+  .toast {
+    min-width: auto;
+  }
+}
