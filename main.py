@@ -548,6 +548,15 @@ Please modify or rewrite the above code according to the user's request."""
         total_fixes = sum(len(f['fixes']) for f in all_fixes)
         code_was_fixed = current_code != original_code
         
+        # ===== PROJECT DESCRIPTION (for chat cards) =====
+        project_desc = orchestrator.generate_project_description(
+            code=current_code, 
+            original_code=original_code if code_was_fixed else None,
+            prompt=request.prompt
+        )
+        if project_desc:
+            yield f"data: {json.dumps({'type': 'project_description', 'data': project_desc})}\n\n"
+            
         # Build comprehensive UI for final result
         final_ui_components = []
         
@@ -575,6 +584,7 @@ Please modify or rewrite the above code according to the user's request."""
                 'prompt': request.prompt,
                 'all_fixes': all_fixes,
                 'setup_guide': setup_guide,
+                'project_desc': project_desc,
                 'total_fixes': total_fixes,
                 'code_was_fixed': code_was_fixed,
                 'workflow': workflow_steps,

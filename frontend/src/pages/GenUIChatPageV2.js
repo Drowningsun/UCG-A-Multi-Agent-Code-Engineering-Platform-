@@ -399,6 +399,7 @@ const GenUIChatPageV2 = () => {
       let finalAllFixes = [];
       let localAgentMessages = []; // Track agent messages locally for saving
       let setupGuideData = null; // Track setup guide for multi-file projects
+      let projectDescData = null; // Track LLM project description
       const startTime = Date.now(); // Track start time for duration calculation
 
       while (true) {
@@ -505,6 +506,11 @@ const GenUIChatPageV2 = () => {
               setupGuideData = data.data || null;
               break;
 
+            case 'project_description':
+              // Capture LLM-generated project description for the chat card
+              projectDescData = data.data || null;
+              break;
+
             case 'complete':
               // Merge backend all_fixes with locally collected fixes
               const backendFixes = data.payload?.all_fixes || [];
@@ -526,6 +532,7 @@ const GenUIChatPageV2 = () => {
                 all_fixes: mergedFixes,
                 code_was_fixed: data.payload?.code_was_fixed || mergedFixes.length > 0,
                 total_fixes: data.payload?.total_fixes || mergedFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0),
+                project_desc: data.payload?.project_desc || projectDescData,
                 workflow: data.payload?.workflow,
                 stats: {
                   ...data.payload?.stats,
@@ -559,6 +566,7 @@ const GenUIChatPageV2 = () => {
         tests: agentResults.testing || agentResults['testing agent'],
         security: agentResults.security || agentResults['security agent'],
         setup_guide: setupGuideData,
+        project_desc: projectDescData,
         stats: {
           totalDuration: totalDuration,
           totalLines: fullCode.split('\n').length,
@@ -582,6 +590,7 @@ const GenUIChatPageV2 = () => {
           tests: savedResult.tests,
           security: savedResult.security,
           setup_guide: setupGuideData,
+          project_desc: savedResult.project_desc,
           stats: savedResult.stats,
           version: nextVersion,
           agent_messages: localAgentMessages.slice(-20)
@@ -705,7 +714,6 @@ const GenUIChatPageV2 = () => {
 
     const lines = code.split('\n').length;
     const promptLower = prompt?.toLowerCase() || '';
-    const cleanPrompt = promptLower.replace(/\b(create|build|write|generate|make|add|simple|basic|a|an|the|me|please|hey|just)\b/gi, '').trim();
 
     // ── Language detection ─────────────────────────────────────────
     const isReact = code.includes("from 'react'") || code.includes('useState') || code.includes('useEffect') || code.includes('import React');
@@ -763,11 +771,11 @@ const GenUIChatPageV2 = () => {
 
       // Summary
       if (components.length > 0) {
-        desc.summary = `I've built **${components[0]}**${components.length > 1 ? ` along with ${components.length - 1} other component${components.length > 2 ? 's' : ''}` : ''} that ${cleanPrompt || 'implements the requested functionality'}. The code follows modern React best practices and is production-ready.`;
+        desc.summary = `I've built **${components[0]}**${components.length > 1 ? ` along with ${components.length - 1} other component${components.length > 2 ? 's' : ''}` : ''}. The code follows modern React best practices and is production-ready.`;
       } else if (jsFuncs.length > 0) {
-        desc.summary = `I've implemented **${jsFuncs[0]}**${jsFuncs.length > 1 ? ` and ${jsFuncs.length - 1} other function${jsFuncs.length > 2 ? 's' : ''}` : ''} to ${cleanPrompt || 'handle the requested logic'}. Clean, modular, and well-structured JavaScript.`;
+        desc.summary = `I've implemented **${jsFuncs[0]}**${jsFuncs.length > 1 ? ` and ${jsFuncs.length - 1} other function${jsFuncs.length > 2 ? 's' : ''}` : ''}. Clean, modular, and well-structured JavaScript.`;
       } else {
-        desc.summary = `Here's a ${isReact ? 'React' : 'JavaScript'} implementation that ${cleanPrompt || 'addresses your requirements'}. Structured for maintainability with modern best practices.`;
+        desc.summary = `Here's a ${isReact ? 'React' : 'JavaScript'} implementation tailored to your request. Structured for maintainability with modern best practices.`;
       }
 
       // Key components
@@ -828,11 +836,11 @@ const GenUIChatPageV2 = () => {
     // Summary
     if (classMatch.length > 0) {
       const methodCount = publicMethods.length;
-      desc.summary = `I've created a **${classMatch[0]}** class with ${methodCount} method${methodCount !== 1 ? 's' : ''} that ${cleanPrompt || 'implements the requested functionality'}. The code follows Python best practices and includes proper error handling.`;
+      desc.summary = `I've created a **${classMatch[0]}** class with ${methodCount} method${methodCount !== 1 ? 's' : ''}. The code follows Python best practices and includes proper error handling.`;
     } else if (publicMethods.length > 0) {
-      desc.summary = `I've implemented **${publicMethods[0]}**${publicMethods.length > 1 ? ` along with ${publicMethods.length - 1} helper function${publicMethods.length > 2 ? 's' : ''}` : ''} that ${cleanPrompt || 'performs the requested operation'}. Production-ready with comprehensive error handling.`;
+      desc.summary = `I've implemented **${publicMethods[0]}**${publicMethods.length > 1 ? ` along with ${publicMethods.length - 1} helper function${publicMethods.length > 2 ? 's' : ''}` : ''}. Production-ready with comprehensive error handling.`;
     } else {
-      desc.summary = `Here's a Python implementation that ${cleanPrompt || 'addresses your requirements'}. Structured for maintainability following best practices.`;
+      desc.summary = `Here's a Python implementation tailored to your request. Structured for maintainability following best practices.`;
     }
 
     // Key points
@@ -1105,7 +1113,8 @@ const GenUIChatPageV2 = () => {
 
                   {/* Code description for assistant messages with results */}
                   {msg.role === 'assistant' && msg.hasResult && msg.code_output && (() => {
-                    const desc = generateDescription(msg.code_output, messages[index - 1]?.content);
+                    const fallbackDesc = generateDescription(msg.code_output, messages[index - 1]?.content);
+                    const desc = msg.workflow_data?.project_desc ? { ...fallbackDesc, ...msg.workflow_data.project_desc } : fallbackDesc;
                     const msgFixes = msg.workflow_data?.all_fixes || [];
                     const msgDedupFixes = deduplicateFixes(msgFixes);
                     const msgTotalFixes = msgDedupFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
