@@ -7,6 +7,7 @@ import ScrollReveal, { StaggerContainer, StaggerItem } from '../components/Scrol
 import Typewriter from '../components/Typewriter';
 import SpotlightCard from '../components/SpotlightCard';
 import TiltCard from '../components/TiltCard';
+import AgentPipeline from '../components/AgentPipeline';
 import './LandingPage.css';
 
 const LandingPage = () => {
@@ -181,39 +182,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Workflow Section */}
-      <section id="workflow" className="workflow">
-        <div className="container">
-          <ScrollReveal direction="fadeUp">
-            <h2 className="section-title">How It Works</h2>
-            <p className="section-subtitle">A seamless orchestration of AI agents</p>
-          </ScrollReveal>
-          <StaggerContainer staggerDelay={0.1} className="workflow-timeline">
-            {workflow.map((item, index) => (
-              <React.Fragment key={index}>
-                <StaggerItem direction="fadeUp">
-                  <div className="workflow-step">
-                    <div className="step-number">{item.step}</div>
-                    <div className="step-content">
-                      <h4>{item.title}</h4>
-                      <p>{item.desc}</p>
-                    </div>
-                  </div>
-                </StaggerItem>
-                {index < workflow.length - 1 && (
-                  <StaggerItem direction="scaleIn">
-                    <div className="step-arrow">
-                      <svg width="40" height="24" viewBox="0 0 40 24" fill="none">
-                        <path d="M0 12H36M36 12L26 4M36 12L26 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                  </StaggerItem>
-                )}
-              </React.Fragment>
-            ))}
-          </StaggerContainer>
-        </div>
-      </section>
+      {/* The Agent Pipeline Section */}
+      <AgentPipeline />
 
       {/* About Section */}
       <section id="about" className="about">
