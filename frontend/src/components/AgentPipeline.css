@@ -47,7 +47,12 @@
   gap: 1rem;
 }
 
+.ap-tabs > div {
+  width: 100%;
+}
+
 .ap-tab-btn {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 1rem;

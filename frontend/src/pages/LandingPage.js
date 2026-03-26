@@ -5,44 +5,12 @@ import UserMenu from '../components/UserMenu';
 import Ballpit from '../components/Ballpit';
 import ScrollReveal, { StaggerContainer, StaggerItem } from '../components/ScrollReveal';
 import Typewriter from '../components/Typewriter';
-import SpotlightCard from '../components/SpotlightCard';
-import TiltCard from '../components/TiltCard';
 import AgentPipeline from '../components/AgentPipeline';
+import FeaturesSection from '../components/FeaturesSection';
 import './LandingPage.css';
 
 const LandingPage = () => {
   const { isAuthenticated } = useAuth();
-
-  const features = [
-    {
-      icon: '⚡',
-      title: 'Code Generator',
-      description: 'AI-powered code generation from natural language prompts'
-    },
-    {
-      icon: '✓',
-      title: 'Validator Agent',
-      description: 'Automatic code validation and style checking'
-    },
-    {
-      icon: '🧪',
-      title: 'Testing Agent',
-      description: 'Automated test execution and coverage analysis'
-    },
-    {
-      icon: '🛡️',
-      title: 'Security Agent',
-      description: 'Vulnerability scanning and security recommendations'
-    }
-  ];
-
-  const workflow = [
-    { step: 1, title: 'Enter Prompt', desc: 'Describe what you want to build' },
-    { step: 2, title: 'Generate Code', desc: 'AI creates the initial code' },
-    { step: 3, title: 'Validate', desc: 'Code quality checks run' },
-    { step: 4, title: 'Test', desc: 'Automated tests execute' },
-    { step: 5, title: 'Secure', desc: 'Security scan completes' }
-  ];
 
   return (
     <div className="landing-page">
@@ -75,7 +43,7 @@ const LandingPage = () => {
           </div>
           <nav className="nav">
             <a href="#features">Features</a>
-            <a href="#workflow">Workflow</a>
+            <a href="#pipeline">Pipeline</a>
             <a href="#about">About</a>
             {isAuthenticated ? (
               <>
@@ -159,28 +127,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="features">
-        <div className="container">
-          <ScrollReveal direction="fadeUp">
-            <h2 className="section-title">Powered by 4 Specialized Agents</h2>
-            <p className="section-subtitle">Each agent focuses on a specific task in the code generation pipeline</p>
-          </ScrollReveal>
-          <StaggerContainer staggerDelay={0.12} className="features-grid">
-            {features.map((feature, index) => (
-              <StaggerItem key={index} direction="fadeUp">
-                <TiltCard>
-                  <SpotlightCard className="feature-card" spotlightColor="rgba(249, 115, 22, 0.15)" borderColor="rgba(249, 115, 22, 0.3)">
-                    <div className="feature-icon">{feature.icon}</div>
-                    <h3 className="feature-title">{feature.title}</h3>
-                    <p className="feature-description">{feature.description}</p>
-                  </SpotlightCard>
-                </TiltCard>
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
-        </div>
-      </section>
+      {/* Engineered Features Section */}
+      <FeaturesSection />
 
       {/* The Agent Pipeline Section */}
       <AgentPipeline />

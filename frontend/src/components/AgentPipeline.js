@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Terminal, CheckCircle, Activity, Shield, ChevronRight } from 'lucide-react';
+import ScrollReveal, { StaggerContainer, StaggerItem } from './ScrollReveal';
 import './AgentPipeline.css';
 
 const AgentPipeline = () => {
@@ -47,13 +48,13 @@ const AgentPipeline = () => {
         return (
           <div className="ap-diff-container">
             <div className="ap-diff-box ap-diff-left">
-              <div className="ap-diff-header">// Previous Draft</div>
+              <div className="ap-diff-header">{"// Previous Draft"}</div>
               <div><span className="c-blue">def</span> get_user(id):</div>
               <div className="ap-line-del">  # fetch user</div>
               <div className="ap-line-del">  return db.query("select * from users where id="+id)</div>
             </div>
             <div className="ap-diff-box ap-diff-right">
-              <div className="ap-diff-header">// Validated, Clean Code</div>
+              <div className="ap-diff-header">{"// Validated, Clean Code"}</div>
               <div><span className="c-blue">async def</span> get_user_async(user_id: UUID) -&gt; UserSchema:</div>
               <div className="ap-line-add">  """Fetches user context from secure cache"""</div>
               <div className="ap-line-add">  return await db.users.find_one({"{id: user_id}"})</div>
@@ -116,32 +117,35 @@ const AgentPipeline = () => {
   };
 
   return (
-    <section className="agent-pipeline-section">
-      <div className="ap-header">
-        <h2 className="ap-title">The Agent Pipeline</h2>
-        <p className="ap-subtitle">See how our specialized agents orchestrate your code lifecycle</p>
-      </div>
+    <section id="pipeline" className="agent-pipeline-section">
+      <ScrollReveal direction="fadeUp">
+        <div className="ap-header">
+          <h2 className="ap-title">The Agent Pipeline</h2>
+          <p className="ap-subtitle">See how our specialized agents orchestrate your code lifecycle</p>
+        </div>
+      </ScrollReveal>
 
       <div className="ap-container">
         {/* Left Column: Navigation Tabs */}
-        <div className="ap-tabs">
+        <StaggerContainer staggerDelay={0.1} className="ap-tabs">
           {agents.map((agent) => (
-            <button
-              key={agent.id}
-              className={`ap-tab-btn ${activeAgent === agent.id ? 'active' : 'inactive'}`}
-              onClick={() => setActiveAgent(agent.id)}
-            >
-              <div className="ap-tab-icon">{agent.icon}</div>
-              <div className="ap-tab-text">
-                <h4>{agent.title}</h4>
-                {activeAgent === agent.id && <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{agent.subtext}</span>}
-              </div>
-            </button>
+            <StaggerItem key={agent.id} direction="fadeRight">
+              <button
+                className={`ap-tab-btn ${activeAgent === agent.id ? 'active' : 'inactive'}`}
+                onClick={() => setActiveAgent(agent.id)}
+              >
+                <div className="ap-tab-icon">{agent.icon}</div>
+                <div className="ap-tab-text">
+                  <h4>{agent.title}</h4>
+                  {activeAgent === agent.id && <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{agent.subtext}</span>}
+                </div>
+              </button>
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerContainer>
 
         {/* Right Column: Dynamic Terminal Display */}
-        <div className="ap-terminal">
+        <ScrollReveal direction="fadeLeft" className="ap-terminal">
           <div className="ap-terminal-header">
             <div className="ap-dots">
               <span className="ap-dot red"></span>
@@ -181,7 +185,7 @@ const AgentPipeline = () => {
               );
             })}
           </div>
-        </div>
+        </ScrollReveal>
       </div>
     </section>
   );

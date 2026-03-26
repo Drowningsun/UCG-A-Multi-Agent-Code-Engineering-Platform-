@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   /* Grok AI Theme - Dark with Orange accent */
   --primary: #016bc2;
