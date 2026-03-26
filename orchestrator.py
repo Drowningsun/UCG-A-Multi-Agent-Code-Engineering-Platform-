@@ -327,6 +327,48 @@ RULES:
         
         return None
 
+    def generate_project_description(self, code, original_code, prompt):
+        """Generate a structured, ChatGPT-style project description/changelog."""
+        system_prompt = """You are an expert developer summarizing a project generation or update. 
+Return a JSON object:
+{
+    "title": "A short, fitting emoji title for the project snippet (e.g. '✅ Todo Application' or '📊 Dashboard')",
+    "summary": "Detailed paragraph explaining what was just built. If you see original_code provided, focus largely on explaining the precise changes and updates made from the original code (e.g. 'I refactored the App component and added a Settings page.'). If no original_code is given, explain the initial architecture.",
+    "keyPoints": ["**ComponentName** - What it does", "`helper_func()` - Used for X"],
+    "features": ["**Error handling** with try/catch", "**State management** using hooks"]
+}
+RULES:
+- Limit keyPoints to 3-4 items max.
+- Limit features to 3-5 items max.
+- Be highly conversational in the summary, saying "I have built..." or "I have updated...".
+- Only output valid JSON, absolutely no markdown."""
+
+        user_prompt = f"Prompt: {prompt}\n\n"
+        if original_code and original_code.strip() != code.strip():
+            user_prompt += f"Original Code Snippet:\n{original_code[-2000:]}\n\n"
+            user_prompt += f"Updated Code Snippet:\n{code[-3000:]}"
+        else:
+            user_prompt += f"Original Code: None\n\nGenerated Code Snippet:\n{code[-4000:]}"
+            
+        print(f"📝 Generating LLM description for the code...")
+        from agents.base import call_groq_api
+        
+        # Don't spend too many retries on the visual description
+        result = call_groq_api(self.api_key or self.code_generator.api_key, system_prompt, user_prompt, max_tokens=1000)
+        
+        if result:
+            try:
+                import json
+                json_start = result.find('{')
+                json_end = result.rfind('}') + 1
+                if json_start != -1 and json_end > json_start:
+                    parsed = json.loads(result[json_start:json_end])
+                    return parsed
+            except Exception as e:
+                print(f"⚠️ Failed to parse project description: {e}")
+                
+        return None
+
     def get_agent_info(self):
         """Get information about all agents"""
         return {

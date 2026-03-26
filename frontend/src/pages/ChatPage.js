@@ -11,6 +11,7 @@ import './ChatPage.css';
 const API_BASE = 'http://localhost:5000/api';
 
 // Helper function to format markdown reports to HTML
+// eslint-disable-next-line
 const formatMarkdownReport = (markdown) => {
   if (!markdown) return '';
 
@@ -29,7 +30,7 @@ const formatMarkdownReport = (markdown) => {
     // Inline code
     .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
     // Lists
-    .replace(/^\- (.*$)/gm, '<li>$1</li>')
+    .replace(/^- (.*$)/gm, '<li>$1</li>')
     .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
     // Line breaks
     .replace(/\n\n/g, '</p><p>')
@@ -144,7 +145,7 @@ const detectLanguage = (prompt) => {
 const ChatPage = () => {
   const { sessionId: urlSessionId } = useParams();
   const navigate = useNavigate();
-  const { authAxios, token, user, isAuthenticated, hasReachedGuestLimit, incrementGuestUsage } = useAuth();
+  const { authAxios, token, isAuthenticated, hasReachedGuestLimit, incrementGuestUsage } = useAuth();
   const [sessionId, setSessionId] = useState(urlSessionId || null);
   const [sessionTitle, setSessionTitle] = useState('New Chat');
   const [prompt, setPrompt] = useState('');
@@ -161,7 +162,7 @@ const ChatPage = () => {
   const [showPromptEdit, setShowPromptEdit] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const [agentFixes, setAgentFixes] = useState([]);
-  const [originalCode, setOriginalCode] = useState('');
+  const [, setOriginalCode] = useState('');
   const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
   const messagesEndRef = useRef(null);
   const codeEndRef = useRef(null);
