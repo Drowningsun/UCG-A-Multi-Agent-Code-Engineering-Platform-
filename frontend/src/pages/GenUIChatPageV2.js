@@ -18,6 +18,7 @@ import { useAGUIState, parseSSEData } from '../components/AGUIRenderer';
 import '../components/GenUIComponents.css';
 import TabbedCodeBlock from '../components/TabbedCodeBlock';
 import SetupGuide from '../components/SetupGuide';
+import { UCGLogo } from './LandingPage';
 import './GenUIChatPageV2.css';
 
 const API_BASE = 'http://localhost:5000/api';
@@ -835,9 +836,9 @@ const GenUIChatPageV2 = () => {
       <aside className={`genui-v2-sidebar ${sidebarExpanded ? 'sidebar-expanded' : ''}`}>
         <div className="sidebar-brand">
           <Link to="/" className="brand-link">
-            <span className="brand-icon">🚀</span>
-            {sidebarExpanded && <span className="brand-text-full">Uber Code</span>}
-            {!sidebarExpanded && <span className="brand-text">UBER CODE</span>}
+            <UCGLogo size={28} />
+            {sidebarExpanded && <span className="brand-text-full">UCG</span>}
+            {!sidebarExpanded && <span className="brand-text">UCG</span>}
           </Link>
         </div>
 

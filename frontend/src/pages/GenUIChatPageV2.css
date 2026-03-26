@@ -1,18 +1,19 @@
-/* GenUI Chat Page V2 - Clean, Spacious Design */
-/* Professional split-panel layout */
+/* GenUI Chat Page V2 — Premium Split-Panel Layout */
+/* Unified design system with electric indigo + violet palette */
 
 :root {
-  --genui-bg: #0a0a0f;
-  --genui-surface: #12121a;
-  --genui-surface-2: #1a1a24;
-  --genui-surface-3: #22222e;
-  --genui-border: rgba(255, 255, 255, 0.08);
-  --genui-border-light: rgba(255, 255, 255, 0.12);
-  --genui-text: #ffffff;
-  --genui-text-2: #a0a0b0;
-  --genui-text-3: #606070;
+  --genui-bg: #080810;
+  --genui-surface: #0f0f1a;
+  --genui-surface-2: #16162a;
+  --genui-surface-3: #1e1e35;
+  --genui-border: rgba(255, 255, 255, 0.06);
+  --genui-border-light: rgba(255, 255, 255, 0.10);
+  --genui-text: #e2e8f0;
+  --genui-text-2: #94a3b8;
+  --genui-text-3: #475569;
   --genui-primary: #667eea;
   --genui-primary-light: #8b9cf7;
+  --genui-accent: #8b5cf6;
   --genui-success: #10b981;
   --genui-warning: #f59e0b;
   --genui-error: #ef4444;
@@ -38,7 +39,7 @@
 /* Sidebar */
 .genui-v2-sidebar {
   width: 72px;
-  background: var(--genui-surface);
+  background: linear-gradient(180deg, var(--genui-surface) 0%, var(--genui-bg) 100%);
   border-right: 1px solid var(--genui-border);
   display: flex;
   flex-direction: column;
@@ -99,6 +100,7 @@
   letter-spacing: -0.02em;
   background: linear-gradient(135deg, #fff 0%, #a0a0b0 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: fadeIn 0.3s ease;
 }
@@ -414,9 +416,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 32px;
+  padding: 14px 32px;
   border-bottom: 1px solid var(--genui-border);
-  background: var(--genui-surface);
+  background: linear-gradient(180deg, var(--genui-surface) 0%, rgba(15, 15, 26, 0.95) 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .header-title {
@@ -957,10 +961,12 @@
 
 /* Input Container */
 .input-container {
-  padding: 24px 32px;
-  background: var(--genui-surface);
+  padding: 20px 32px;
+  background: linear-gradient(180deg, rgba(15, 15, 26, 0.95) 0%, var(--genui-surface) 100%);
   border-top: 1px solid var(--genui-border);
   flex-shrink: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .input-form {
@@ -972,19 +978,20 @@
 
 .input-form input {
   flex: 1;
-  padding: 16px 20px;
+  padding: 16px 22px;
   background: var(--genui-bg);
   border: 1px solid var(--genui-border);
-  border-radius: 16px;
+  border-radius: 14px;
   color: var(--genui-text);
-  font-size: 1rem;
-  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  font-family: 'Inter', inherit;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .input-form input:focus {
   outline: none;
   border-color: var(--genui-primary);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
 }
 
 .input-form input::placeholder {
@@ -992,28 +999,30 @@
 }
 
 .input-form button {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--genui-primary);
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--genui-primary) 0%, var(--genui-accent) 100%);
   border: none;
   color: white;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.2);
 }
 
 .input-form button:hover:not(:disabled) {
-  background: var(--genui-primary-light);
   transform: scale(1.05);
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.35);
 }
 
 .input-form button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .spinner {
@@ -1090,8 +1099,8 @@
 .genui-v2-panel {
   min-width: 520px;
   max-width: 900px;
-  background: linear-gradient(180deg, #13131d 0%, #0e0e16 100%);
-  border-left: 1px solid rgba(102, 126, 234, 0.08);
+  background: linear-gradient(180deg, var(--genui-surface) 0%, var(--genui-bg) 100%);
+  border-left: 1px solid var(--genui-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1099,7 +1108,7 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.4);
 }
 
 .panel-tabs {
