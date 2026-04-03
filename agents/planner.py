@@ -107,38 +107,42 @@ a production-ready application that runs perfectly on the first try with premium
 
 Your output MUST be a plain text enhanced prompt (NOT JSON, NOT code). It should read like a detailed architect's brief.
 
-═══ TECH STACK & CONFIGURATION ═══
-For React/JavaScript projects, specify EXACTLY:
-- React 18 + Vite 5 build tool
-- package.json with "type": "module"
-- dependencies: react@^18.2.0, react-dom@^18.2.0, react-router-dom@^6.4.0
-- devDependencies: vite@^5.4.0, @vitejs/plugin-react@^4.2.0
-- Scripts: "dev": "vite", "build": "vite build", "preview": "vite preview"
-- index.html at PROJECT ROOT (NOT in public/ folder)
-- index.html must link Google Fonts Inter and have <script type="module" src="/src/main.jsx">
-- vite.config.js with @vitejs/plugin-react
+First, determine if the request is for a FRONTEND-ONLY app, or a FULL-STACK app (if it mentions database, backend, Express, or API).
 
-For Python projects: specify Flask/FastAPI with requirements.txt and working entry point.
-For HTML/CSS/JS (no framework): specify folder structure with css/, js/, assets/.
+═══ TECH STACK & CONFIGURATION ═══
+FRONTEND-ONLY:
+- React 18 + Vite 5 build tool
+- Root package.json with "type": "module", dependencies: react, react-dom, react-router-dom. devDependencies: vite, @vitejs/plugin-react
+- index.html at PROJECT ROOT MUST link Google Fonts Inter and have <script type="module" src="/src/main.jsx">
+- vite.config.js with @vitejs/plugin-react
+- Scripts: "dev": "vite", "build": "vite build"
+
+FULL-STACK / BACKEND:
+- React 18 + Vite 5 frontend WITH an Express.js backend natively integrated.
+- A SINGLE root package.json that installs BOTH backend (express) and frontend tools (react, vite).
+- Scripts must include ways to run both together, e.g., "server": "node server.js", "dev": "vite", "start": "concurrently \\"npm run server\\" \\"npm run dev\\""
+- Root `server.js` running Express on port 3001, providing JSON parsing `express.json()`.
+- `vite.config.js` MUST set up a proxy to route `/api` to `http://localhost:3001`.
+- index.html at PROJECT ROOT MUST link Google Fonts Inter and have <script type="module" src="/src/main.jsx">
 
 ═══ FILE STRUCTURE & IMPORT RULES ═══
-List EVERY file with its exact path. For React projects, use this structure:
+List EVERY file with its exact path. For React projects:
 - package.json, vite.config.js, index.html, README.md (all at root)
 - src/main.jsx — imports './styles/globals.css', uses createRoot, wraps app in BrowserRouter
 - src/components/[Name].jsx — one per feature/page
 - src/styles/globals.css — the CSS design system
 - src/styles/[Name].css — one CSS file per component
+If FULL-STACK, also include `server.js` at root.
 
-CRITICAL IMPORT CONVENTIONS (specify these in your brief):
+CRITICAL IMPORT CONVENTIONS:
 - Every component file: "export default ComponentName" at the bottom (NEVER named exports)
 - Every import: "import ComponentName from './ComponentName.jsx'" (NEVER curly braces for components)
 - Every CSS import from components: "import '../styles/ComponentName.css'" 
-- For each component you list, write: "[Component].jsx (imports '../styles/[Component].css')" to confirm the path match
-- src/main.jsx must import: './styles/globals.css'
+- For each component, write: "[Component].jsx (imports '../styles/[Component].css')" to confirm the path match
 
-═══ DATA PERSISTENCE ═══
-- For frontend-only apps: ALWAYS use localStorage — NEVER call fake API URLs like example.com
-- If a real backend is needed, specify a working API with routes, controllers, and models
+═══ DATA PERSISTENCE & API DESIGN ═══
+- Frontend-only: ALWAYS use `localStorage` for persistence. NEVER call fake API URLs.
+- Full-stack: The Express `server.js` must define explicit API routes (e.g., GET /api/todos, POST /api/todos). You MUST explicitly list the required API endpoints and data model definitions (e.g., `const items = []`) in your output. The React frontend MUST use `fetch` or `axios` to call these routes, and NEVER use `localStorage`.
 
 ═══ DESIGN SYSTEM (MANDATORY — SPECIFY THESE EXACT VALUES) ═══
 Instruct the code generator to use this dark theme CSS design system in globals.css:
@@ -160,7 +164,7 @@ Global reset: *, *::before, *::after { margin:0; padding:0; box-sizing:border-bo
 Body: dark bg, Inter font, smooth scrolling, antialiased text
 
 ═══ UI PATTERNS TO SPECIFY ═══
-For each page/component, describe these styling requirements:
+For each page/component, describe these styling requirements in deep detail:
 - Hero/Landing: gradient text (background-clip:text), animated CTA button with glow shadow,
   feature cards with dark surface + border + hover lift effect, radial gradient bg decoration
 - Forms: dark surface inputs with border, purple focus ring (box-shadow glow), gradient submit button
@@ -171,13 +175,13 @@ For each page/component, describe these styling requirements:
 - Animations: @keyframes fadeInUp, fadeIn, pulse — apply to page enters and list items
 
 ═══ OUTPUT FORMAT ═══
-Your enhanced prompt should be 300-500 words and include:
+Your enhanced prompt should be highly detailed (400-600 words) and include:
 1. Project overview (1-2 sentences describing what to build)
 2. Complete file list with exact paths and CSS import mappings
-3. Tech stack with exact package versions  
-4. Feature list with UI description for each feature
+3. Tech stack with exact package versions (specifying Full-Stack Express config if needed) 
+4. Feature list with UI description for each feature (If full-stack, explicitly list the Backend API endpoints and expected data schemas).
 5. Design system summary (reference the CSS variables above)
-6. Reminder: export default, no curly brace imports, localStorage, index.html at root
+6. Data Persistence instruction (localStorage OR standard fetch to Express /api, clearly stated)
 
 DO NOT generate any code. Output only the enhanced text prompt."""
 
