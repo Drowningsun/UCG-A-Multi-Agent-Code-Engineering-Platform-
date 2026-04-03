@@ -1,7 +1,7 @@
 // Generative UI Chat Interface V2 - Clean Split-Panel Design
 // Professional-grade, spacious layout with AG-UI Protocol
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from '../components/UserMenu';
@@ -21,15 +21,107 @@ import SetupGuide from '../components/SetupGuide';
 import { UCGLogo } from './LandingPage';
 import './GenUIChatPageV2.css';
 
-const API_BASE = 'http://localhost:5000/api';
+const GodParticleOrb = lazy(() => import('../components/GodParticleOrb'));
+
+// Lightweight placeholder while orb loads
+const OrbFallback = () => (
+  <div style={{
+    width: 420, height: 420, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    margin: '0 auto 24px'
+  }}>
+    <div style={{
+      width: 180, height: 180, borderRadius: '50%',
+      background: 'radial-gradient(circle at 40% 40%, #3b82f6 0%, #1e3a5f 50%, #0a1628 100%)',
+      boxShadow: '0 0 80px rgba(59,130,246,0.3), 0 0 160px rgba(59,130,246,0.1)',
+      animation: 'godGlowPulse 2s ease-in-out infinite'
+    }} />
+  </div>
+);
+
+const API_BASE = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : '/api';
+
+// --- SVG Icon Components ---
+const IconUser = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+const IconBot = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>
+  </svg>
+);
+const IconDashboard = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+  </svg>
+);
+const IconChat = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+);
+const IconSun = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+);
+const IconMoon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+);
+const IconCode = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+    <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+  </svg>
+);
+const IconWrench = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+  </svg>
+);
+const IconCpu = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+    <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+  </svg>
+);
+
+// --- Sidebar Skeleton ---
+const SidebarSkeleton = () => (
+  <>
+    {[1,2,3,4].map(i => (
+      <div className="skeleton-item" key={i}>
+        <div className="skeleton-circle" />
+        <div className="skeleton-lines">
+          <div className="skeleton-line" />
+          <div className="skeleton-line short" />
+        </div>
+      </div>
+    ))}
+  </>
+);
 
 const GenUIChatPageV2 = () => {
   const { sessionId: urlSessionId } = useParams();
   const navigate = useNavigate();
   const { authAxios, token, isAuthenticated, hasReachedGuestLimit, incrementGuestUsage } = useAuth();
 
+  // Theme state
+  const [theme, setTheme] = useState(() => localStorage.getItem('ucg-theme') || 'dark');
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('ucg-theme', next);
+      return next;
+    });
+  }, []);
+
   // Usage limit modal state
   const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
+
+  // Sessions loading state
+  const [sessionsLoading, setSessionsLoading] = useState(true);
 
   // Session state
   const [sessionId, setSessionId] = useState(urlSessionId || null);
@@ -51,8 +143,9 @@ const GenUIChatPageV2 = () => {
   const [result, setResult] = useState(null);
   const [showOriginal, setShowOriginal] = useState(false);
 
-  // Sidebar state - default expanded
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  // Sidebar state - collapse on mobile by default
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => window.innerWidth > 768);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   const [chatSessions, setChatSessions] = useState([]);
 
   // Edit message state
@@ -66,6 +159,19 @@ const GenUIChatPageV2 = () => {
   const [rightPanelTab, setRightPanelTab] = useState('code'); // 'code', 'agents', 'fixes'
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [panelWidth, setPanelWidth] = useState(500);
+
+  // Mobile detection & auto-collapse sidebar
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (mobile && sidebarExpanded) {
+        setSidebarExpanded(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [isResizing, setIsResizing] = useState(false);
 
   // Active agent for display
@@ -86,6 +192,7 @@ const GenUIChatPageV2 = () => {
   const messagesEndRef = useRef(null);
   const sessionCreatedRef = useRef(false);
   const resizeRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -247,12 +354,18 @@ const GenUIChatPageV2 = () => {
 
   // --- Sidebar: fetch chat sessions ---
   const fetchSessions = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setSessionsLoading(false);
+      return;
+    }
+    setSessionsLoading(true);
     try {
       const response = await authAxios.get('/sessions');
       setChatSessions(response.data || []);
     } catch (error) {
       console.error('Error fetching sessions:', error);
+    } finally {
+      setSessionsLoading(false);
     }
   }, [isAuthenticated, authAxios]);
 
@@ -264,7 +377,12 @@ const GenUIChatPageV2 = () => {
   // Relative time helper
   const timeAgo = (dateStr) => {
     const now = new Date();
-    const date = new Date(dateStr);
+    // MongoDB stores UTC — ensure the string is parsed as UTC
+    let utcStr = dateStr;
+    if (utcStr && !utcStr.endsWith('Z') && !utcStr.includes('+')) {
+      utcStr += 'Z';
+    }
+    const date = new Date(utcStr);
     const seconds = Math.floor((now - date) / 1000);
     if (seconds < 60) return 'just now';
     const minutes = Math.floor(seconds / 60);
@@ -386,10 +504,14 @@ const GenUIChatPageV2 = () => {
         context_code: result?.code || null  // Send previous code for follow-up prompts
       };
 
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       const response = await fetch(`${API_BASE}/generate/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: abortController.signal
       });
 
       const reader = response.body.getReader();
@@ -643,12 +765,21 @@ const GenUIChatPageV2 = () => {
       }
 
     } catch (error) {
-      console.error('Error:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '❌ Error generating code. Please try again.'
-      }]);
+      if (error.name === 'AbortError') {
+        console.log('Generation terminated by user');
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '⏹ Generation stopped by user.'
+        }]);
+      } else {
+        console.error('Error:', error);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'Error generating code. Please try again.'
+        }]);
+      }
     } finally {
+      abortControllerRef.current = null;
       setLoading(false);
       setPrompt('');
       // Trigger completion celebration
@@ -662,12 +793,19 @@ const GenUIChatPageV2 = () => {
     const icons = {
       code_generator: '⚡',
       validator: '✓',
-      testing: '🧪',
-      security: '🛡️'
+      testing: '⬡',
+      security: '◈'
     };
     const key = agentId?.toLowerCase().replace(' agent', '').replace(' ', '_');
-    return icons[key] || '🤖';
+    return icons[key] || '◉';
   };
+
+  // Terminate generation
+  const handleTerminate = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
 
   // Handle clicking on a user message to edit
   const handleEditMessage = (index, content) => {
@@ -904,7 +1042,15 @@ const GenUIChatPageV2 = () => {
   const totalFixes = deduplicatedFixes.reduce((sum, f) => sum + (f.fixes?.length || 0), 0);
 
   return (
-    <div className={`genui-v2 ${isResizing ? 'resizing' : ''}`}>
+    <div className={`genui-v2 ${isResizing ? 'resizing' : ''} ${theme === 'light' ? 'light' : ''}`}>
+      {/* Mobile sidebar backdrop */}
+      {isMobile && sidebarExpanded && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setSidebarExpanded(false)}
+        />
+      )}
+
       {/* Expandable Sidebar */}
       <aside className={`genui-v2-sidebar ${sidebarExpanded ? 'sidebar-expanded' : ''}`}>
         <div className="sidebar-brand">
@@ -922,7 +1068,7 @@ const GenUIChatPageV2 = () => {
             {!sidebarExpanded && <span>New</span>}
           </button>
           <Link to="/dashboard" className="action-btn">
-            <span>📊</span>
+            <span><IconDashboard /></span>
             {sidebarExpanded && <span className="action-label">Dashboard</span>}
             {!sidebarExpanded && <span>History</span>}
           </Link>
@@ -945,31 +1091,37 @@ const GenUIChatPageV2 = () => {
               <span className="chats-count">{chatSessions.filter(s => s.message_count > 0).length}</span>
             </div>
             <div className="chats-list">
-              {chatSessions
-                .filter(session => session.message_count > 0)
-                .map((session) => (
-                  <button
-                    key={session.session_id}
-                    className={`chat-item ${session.session_id === sessionId ? 'active' : ''}`}
-                    onClick={() => {
-                      navigate(`/chat/${session.session_id}`);
-                    }}
-                    title={session.title}
-                  >
-                    <span className="chat-icon">💬</span>
-                    <div className="chat-item-info">
-                      <span className="chat-item-title">{session.title || 'New Chat'}</span>
-                      <span className="chat-item-meta">
-                        {timeAgo(session.updated_at)}
-                        {session.message_count > 0 && (
-                          <span className="chat-msg-count">· {session.message_count} msgs</span>
-                        )}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              {chatSessions.filter(s => s.message_count > 0).length === 0 && (
-                <div className="chats-empty">No active chats</div>
+              {sessionsLoading ? (
+                <SidebarSkeleton />
+              ) : (
+                <>
+                  {chatSessions
+                    .filter(session => session.message_count > 0)
+                    .map((session) => (
+                      <button
+                        key={session.session_id}
+                        className={`chat-item ${session.session_id === sessionId ? 'active' : ''}`}
+                        onClick={() => {
+                          navigate(`/chat/${session.session_id}`);
+                        }}
+                        title={session.title}
+                      >
+                        <span className="chat-icon"><IconChat /></span>
+                        <div className="chat-item-info">
+                          <span className="chat-item-title">{session.title || 'New Chat'}</span>
+                          <span className="chat-item-meta">
+                            {timeAgo(session.updated_at)}
+                            {session.message_count > 0 && (
+                              <span className="chat-msg-count">· {session.message_count} msgs</span>
+                            )}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  {chatSessions.filter(s => s.message_count > 0).length === 0 && (
+                    <div className="chats-empty">No active chats</div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -983,22 +1135,39 @@ const GenUIChatPageV2 = () => {
       {/* Main Chat Area */}
       <main
         className={`genui-v2-main ${showRightPanel && (streamingCode || result) ? 'with-panel' : ''}`}
-        style={showRightPanel && (streamingCode || result) ? { maxWidth: `calc(100vw - ${sidebarWidth}px - ${panelWidth}px)` } : {}}
+        style={showRightPanel && (streamingCode || result) && !isMobile ? { maxWidth: `calc(100vw - ${sidebarWidth}px - ${panelWidth}px)` } : {}}
       >
         {/* Header */}
         <header className="main-header">
           <div className="header-title">
+            {/* Mobile hamburger */}
+            <button
+              className="mobile-sidebar-toggle"
+              onClick={() => setSidebarExpanded(!sidebarExpanded)}
+              aria-label="Toggle sidebar"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
             <h1>{sessionTitle}</h1>
             <Badge variant="primary" size="sm">GenUI</Badge>
           </div>
-          {(streamingCode || result) && (
-            <button
-              className="panel-toggle"
-              onClick={() => setShowRightPanel(!showRightPanel)}
-            >
-              {showRightPanel ? '◀ Hide Panel' : '▶ Show Panel'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+              {theme === 'dark' ? <IconSun /> : <IconMoon />}
             </button>
-          )}
+            {(streamingCode || result) && (
+              <button
+                className="panel-toggle"
+                onClick={() => setShowRightPanel(!showRightPanel)}
+              >
+                {showRightPanel ? '◀ Hide Panel' : '▶ Show Panel'}
+              </button>
+            )}
+          </div>
         </header>
 
         {/* Floating Workflow Indicator */}
@@ -1036,31 +1205,11 @@ const GenUIChatPageV2 = () => {
           {messages.length === 0 && !loading && (
             <div className="welcome-screen">
               <div className="welcome-content">
-                <div className="welcome-icon">✨</div>
+                <Suspense fallback={<OrbFallback />}>
+                  <GodParticleOrb size={420} />
+                </Suspense>
                 <h2>Uber Code Generator</h2>
-                <p>AI-powered code generation with real-time Generative UI</p>
-
-                <div className="quick-prompts">
-                  <h4>Quick Start</h4>
-                  <div className="prompt-grid">
-                    <button onClick={() => setPrompt('Create a Python function to fetch API data with retry logic and error handling')}>
-                      <span>🔄</span>
-                      <span>API with Retry</span>
-                    </button>
-                    <button onClick={() => setPrompt('Create a user authentication class with password hashing')}>
-                      <span>🔐</span>
-                      <span>Auth Class</span>
-                    </button>
-                    <button onClick={() => setPrompt('Build a rate limiter decorator for API endpoints')}>
-                      <span>⏱️</span>
-                      <span>Rate Limiter</span>
-                    </button>
-                    <button onClick={() => setPrompt('Create a database connection pool manager')}>
-                      <span>🗄️</span>
-                      <span>DB Pool</span>
-                    </button>
-                  </div>
-                </div>
+                <p className="welcome-subtitle">Describe what you want to build. 4 AI agents will generate, validate, test, and secure your code.</p>
               </div>
             </div>
           )}
@@ -1076,7 +1225,7 @@ const GenUIChatPageV2 = () => {
                 onClick={() => msg.role === 'assistant' && msg.hasResult && selectMessage(index)}
               >
                 <div className="message-avatar">
-                  {msg.role === 'user' ? '👤' : '🤖'}
+                  {msg.role === 'user' ? <IconUser /> : <IconBot />}
                 </div>
                 <div className="message-body">
                   {/* Editable user message */}
@@ -1106,7 +1255,7 @@ const GenUIChatPageV2 = () => {
                           onClick={() => handleEditMessage(index, msg.content)}
                           title="Edit message"
                         >
-                          ✏️
+                          ✎
                         </button>
                       )}
                     </>
@@ -1178,7 +1327,7 @@ const GenUIChatPageV2 = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
               >
-                <div className="message-avatar">🤖</div>
+                <div className="message-avatar"><IconBot /></div>
                 <div className="message-body">
                   <div className="typing-indicator">
                     <span className="typing-text">
@@ -1206,13 +1355,15 @@ const GenUIChatPageV2 = () => {
               placeholder="Describe the code you want to generate..."
               disabled={loading}
             />
-            <button type="submit" disabled={loading || !prompt.trim()}>
-              {loading ? (
-                <span className="spinner"></span>
-              ) : (
+            {loading ? (
+              <button type="button" className="terminate-btn" onClick={handleTerminate} title="Stop generation">
+                <div className="stop-icon" />
+              </button>
+            ) : (
+              <button type="submit" disabled={!prompt.trim()}>
                 <span>→</span>
-              )}
-            </button>
+              </button>
+            )}
           </form>
           <p className="input-hint">Powered by Llama 3.3 via Groq • 4 AI Agents</p>
         </div>
@@ -1244,25 +1395,35 @@ const GenUIChatPageV2 = () => {
             >
               {/* Panel Tabs */}
               <div className="panel-tabs">
+                {/* Mobile back button */}
+                {isMobile && (
+                  <button 
+                    className="panel-back-btn"
+                    onClick={() => setShowRightPanel(false)}
+                    title="Back to chat"
+                  >
+                    ← Chat
+                  </button>
+                )}
                 <button
                   className={rightPanelTab === 'code' ? 'active' : ''}
                   onClick={() => setRightPanelTab('code')}
                 >
-                  <span>📝</span> Code
+                  <IconCode /> Code
                   {loading && <span className="live-dot"></span>}
                 </button>
                 <button
                   className={rightPanelTab === 'agents' ? 'active' : ''}
                   onClick={() => setRightPanelTab('agents')}
                 >
-                  <span>🤖</span> Agents
+                  <IconCpu /> Agents
                   {agentMessages.length > 0 && <span className="count">{agentMessages.length}</span>}
                 </button>
                 <button
                   className={rightPanelTab === 'fixes' ? 'active' : ''}
                   onClick={() => setRightPanelTab('fixes')}
                 >
-                  <span>🔧</span> Fixes
+                  <IconWrench /> Fixes
                   {totalFixes > 0 && <span className="count">{totalFixes}</span>}
                 </button>
               </div>

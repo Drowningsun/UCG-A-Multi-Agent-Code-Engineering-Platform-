@@ -7,7 +7,105 @@ import ScrollReveal, { StaggerContainer, StaggerItem } from '../components/Scrol
 import AnimatedCounter from '../components/AnimatedCounter';
 import ParticleNetwork from '../components/ParticleNetwork';
 import SpotlightCard from '../components/SpotlightCard';
+import { UCGLogo } from './LandingPage';
 import './DashboardPage.css';
+
+// --- Custom SVG Dashboard Icons ---
+const IconBarChart = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="12" width="4" height="9" rx="1" /><rect x="10" y="7" width="4" height="14" rx="1" /><rect x="17" y="3" width="4" height="18" rx="1" />
+  </svg>
+);
+
+const IconChatBubble = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <path d="M8 10h8" /><path d="M8 14h4" />
+  </svg>
+);
+
+const IconSparkles = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
+  </svg>
+);
+
+const IconAgents = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <circle cx="9" cy="10" r="1.5" /><circle cx="15" cy="10" r="1.5" />
+    <path d="M9 15h6" />
+  </svg>
+);
+
+const IconBolt = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
+const IconCheckCircle = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" />
+  </svg>
+);
+
+const IconFlask = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 3h6" /><path d="M10 3v6.5L4 19a1 1 0 0 0 .85 1.5h14.3A1 1 0 0 0 20 19l-6-9.5V3" />
+    <circle cx="12" cy="16" r="1" />
+  </svg>
+);
+
+const IconShield = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" />
+  </svg>
+);
+
+const IconPen = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+
+const IconPackage = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m7.5 4.27 9 5.15" /><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+    <path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
+  </svg>
+);
+
+const IconArrowRight = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+  </svg>
+);
+
+const IconSelect = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="3" /><path d="M9 12l2 2 4-4" />
+  </svg>
+);
+
+const IconBroom = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2l2 7h-4l2-7z" /><path d="M8 9h8l1 13H7L8 9z" /><path d="M10 13v5" /><path d="M14 13v5" />
+  </svg>
+);
+
+const IconTrash = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+  </svg>
+);
+
+const IconSession = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+    <polyline points="14,2 14,8 20,8" /><path d="M8 13h8" /><path d="M8 17h5" />
+  </svg>
+);
 
 const DashboardPage = () => {
   const { authAxios, user, isAuthenticated } = useAuth();
@@ -171,10 +269,10 @@ const DashboardPage = () => {
   };
 
   const agents = [
-    { name: 'Code Generator', icon: '⚡', status: 'active', description: 'Generates code from natural language' },
-    { name: 'Validator', icon: '✓', status: 'active', description: 'Checks code quality and style' },
-    { name: 'Testing Agent', icon: '🧪', status: 'active', description: 'Runs automated tests' },
-    { name: 'Security Agent', icon: '🛡️', status: 'active', description: 'Scans for vulnerabilities' }
+    { name: 'Code Generator', icon: <IconBolt />, status: 'active', description: 'Generates code from natural language' },
+    { name: 'Validator', icon: <IconCheckCircle />, status: 'active', description: 'Checks code quality and style' },
+    { name: 'Testing Agent', icon: <IconFlask />, status: 'active', description: 'Runs automated tests' },
+    { name: 'Security Agent', icon: <IconShield />, status: 'active', description: 'Scans for vulnerabilities' }
   ];
 
   return (
@@ -184,7 +282,7 @@ const DashboardPage = () => {
       <header className="dashboard-header">
         <div className="container header-content">
           <Link to="/" className="logo">
-            <span className="logo-icon">🚀</span>
+            <UCGLogo size={28} />
             <span>Uber Code Generator</span>
           </Link>
           <nav className="nav">
@@ -204,7 +302,7 @@ const DashboardPage = () => {
             <StaggerContainer staggerDelay={0.1} className="stats-grid">
               <StaggerItem direction="fadeUp">
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
-                  <div className="stat-icon">📊</div>
+                  <div className="stat-icon"><IconBarChart /></div>
                   <div className="stat-info">
                     <span className="stat-value"><AnimatedCounter value={sessions.length} duration={800} /></span>
                     <span className="stat-label">Total Sessions</span>
@@ -213,7 +311,7 @@ const DashboardPage = () => {
               </StaggerItem>
               <StaggerItem direction="fadeUp">
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
-                  <div className="stat-icon">💬</div>
+                  <div className="stat-icon"><IconChatBubble /></div>
                   <div className="stat-info">
                     <span className="stat-value"><AnimatedCounter value={sessions.filter(s => s.message_count > 0).length} duration={800} /></span>
                     <span className="stat-label">Active Chats</span>
@@ -222,7 +320,7 @@ const DashboardPage = () => {
               </StaggerItem>
               <StaggerItem direction="fadeUp">
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
-                  <div className="stat-icon">✨</div>
+                  <div className="stat-icon"><IconSparkles /></div>
                   <div className="stat-info">
                     <span className="stat-value"><AnimatedCounter value={sessions.reduce((acc, s) => acc + (s.message_count || 0), 0)} duration={1200} /></span>
                     <span className="stat-label">Total Messages</span>
@@ -231,7 +329,7 @@ const DashboardPage = () => {
               </StaggerItem>
               <StaggerItem direction="fadeUp">
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
-                  <div className="stat-icon">🤖</div>
+                  <div className="stat-icon"><IconAgents /></div>
                   <div className="stat-info">
                     <span className="stat-value"><AnimatedCounter value={4} duration={600} /></span>
                     <span className="stat-label">Active Agents</span>
@@ -273,32 +371,32 @@ const DashboardPage = () => {
             <ScrollReveal direction="scaleIn" delay={0.2}>
               <div className="workflow-diagram">
                 <div className="workflow-node start">
-                  <span>📝</span>
+                  <span><IconPen /></span>
                   <label>User Prompt</label>
                 </div>
-                <div className="workflow-arrow">→</div>
+                <div className="workflow-arrow"><IconArrowRight /></div>
                 <div className="workflow-node">
-                  <span>⚡</span>
+                  <span><IconBolt /></span>
                   <label>Code Gen</label>
                 </div>
-                <div className="workflow-arrow">→</div>
+                <div className="workflow-arrow"><IconArrowRight /></div>
                 <div className="workflow-node">
-                  <span>✓</span>
+                  <span><IconCheckCircle /></span>
                   <label>Validate</label>
                 </div>
-                <div className="workflow-arrow">→</div>
+                <div className="workflow-arrow"><IconArrowRight /></div>
                 <div className="workflow-node">
-                  <span>🧪</span>
+                  <span><IconFlask /></span>
                   <label>Test</label>
                 </div>
-                <div className="workflow-arrow">→</div>
+                <div className="workflow-arrow"><IconArrowRight /></div>
                 <div className="workflow-node">
-                  <span>🛡️</span>
+                  <span><IconShield /></span>
                   <label>Secure</label>
                 </div>
-                <div className="workflow-arrow">→</div>
+                <div className="workflow-arrow"><IconArrowRight /></div>
                 <div className="workflow-node end">
-                  <span>✅</span>
+                  <span><IconPackage /></span>
                   <label>Output</label>
                 </div>
               </div>
@@ -321,7 +419,7 @@ const DashboardPage = () => {
                         onClick={deleteSelectedSessions}
                         disabled={selectedSessions.size === 0}
                       >
-                        🗑️ Delete ({selectedSessions.size})
+                        <IconTrash /> Delete ({selectedSessions.size})
                       </button>
                       <button className="btn btn-sm btn-secondary" onClick={toggleSelectMode}>
                         Cancel
@@ -330,10 +428,10 @@ const DashboardPage = () => {
                   ) : (
                     <>
                       <button className="btn btn-sm btn-secondary" onClick={toggleSelectMode}>
-                        ☑️ Select
+                        <IconSelect /> Select
                       </button>
                       <button className="btn btn-sm btn-secondary" onClick={cleanupEmptySessions}>
-                        🧹 Clean Empty
+                        <IconBroom /> Clean Empty
                       </button>
                     </>
                   )}
@@ -371,7 +469,7 @@ const DashboardPage = () => {
                     )}
                     {!selectMode ? (
                       <Link to={`/chat/${session.session_id}`} className="session-link">
-                        <div className="session-icon">💬</div>
+                        <div className="session-icon"><IconSession /></div>
                         <div className="session-info">
                           <span className="session-title">{session.title || 'New Chat'}</span>
                           <span className="session-date">
@@ -387,13 +485,13 @@ const DashboardPage = () => {
                             onClick={(e) => deleteSession(session.session_id, e)}
                             title="Delete session"
                           >
-                            🗑️
+                            <IconTrash />
                           </button>
                         </div>
                       </Link>
                     ) : (
                       <>
-                        <div className="session-icon">💬</div>
+                        <div className="session-icon"><IconSession /></div>
                         <div className="session-info">
                           <span className="session-title">{session.title || 'New Chat'}</span>
                           <span className="session-date">

@@ -83,3 +83,63 @@
 .landing-page-root * {
   /* intentionally blank — scoping class for isolation */
 }
+
+/* ============================================
+   LANDING PAGE — RESPONSIVE BREAKPOINTS
+   ============================================ */
+
+/* — Tablets — */
+@media (max-width: 768px) {
+  /* 3D Orb container */
+  .landing-page-root canvas {
+    max-width: 280px !important;
+    max-height: 280px !important;
+    margin: 0 auto;
+  }
+
+  /* Landing page nav */
+  .landing-page-root nav {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    gap: 8px;
+  }
+
+  /* Marquee animation — faster on smaller screens */
+  .animate-marquee {
+    animation-duration: 25s;
+  }
+
+  /* Liquid glass button — reduce scale on mobile */
+  .liquid-glass-btn {
+    padding: 14px 24px !important;
+  }
+
+  .liquid-glass-btn:hover {
+    transform: scale(1.03);
+  }
+}
+
+/* — Mobile — */
+@media (max-width: 480px) {
+  .landing-page-root canvas {
+    max-width: 200px !important;
+    max-height: 200px !important;
+  }
+
+  .landing-page-root nav {
+    top: 8px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .liquid-glass-btn {
+    padding: 12px 20px !important;
+    font-size: 0.9rem !important;
+  }
+
+  .animate-marquee {
+    animation-duration: 18s;
+  }
+}

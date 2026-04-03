@@ -190,7 +190,18 @@ const agents = [
 const LandingPage = () => {
   const { isAuthenticated } = useAuth();
   const [activeAgent, setActiveAgent] = useState(0);
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('ucg-theme');
+    return saved ? saved === 'dark' : true;
+  });
+
+  const toggleTheme = () => {
+    setIsDark(prev => {
+      const next = !prev;
+      localStorage.setItem('ucg-theme', next ? 'dark' : 'light');
+      return next;
+    });
+  };
 
   return (
     <div className={isDark?'dark':''}>
@@ -208,7 +219,7 @@ const LandingPage = () => {
             <a href="#about" className="hover:text-indigo-600 dark:hover:text-white transition-colors">About</a>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={()=>setIsDark(!isDark)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-slate-300" aria-label="Toggle Theme">{isDark?<Icons.Sun/>:<Icons.Moon/>}</button>
+            <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-slate-300" aria-label="Toggle Theme">{isDark?<Icons.Sun/>:<Icons.Moon/>}</button>
             {isAuthenticated?(<><Link to="/chat" className="hidden sm:inline-flex text-sm font-bold bg-slate-900 dark:bg-white text-white dark:text-black px-5 py-2.5 rounded-full hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors">Open Editor</Link><UserMenu/></>):(<><Link to="/login" className="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors hidden sm:block">Sign In</Link><Link to="/chat" className="text-sm font-bold bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2.5 rounded-full hover:scale-105 active:scale-95 transition-transform shadow-[0_0_20px_rgba(0,0,0,0.1)] dark:shadow-[0_0_20px_rgba(255,255,255,0.1)]">Start Building</Link></>)}
           </div>
         </motion.nav>
