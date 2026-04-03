@@ -9,6 +9,7 @@ from agents import (
     ValidationAgent,
     TestingAgent,
     SecurityAgent,
+    ProjectPlannerAgent,
     AGENT_INFO
 )
 
@@ -20,19 +21,22 @@ class Orchestrator:
         self.api_key = api_key
         
         # Initialize all agents
+        self.planner = ProjectPlannerAgent(api_key)
         self.code_generator = CodeGeneratorAgent(api_key)
         self.validator = ValidationAgent(api_key)
         self.tester = TestingAgent(api_key)
         self.security = SecurityAgent(api_key)
         
         # Workflow definition (linear pipeline)
-        self._workflow_nodes = ["code_generator", "validator", "tester", "security"]
+        self._workflow_nodes = ["planner", "code_generator", "validator", "tester", "security"]
         self._workflow_edges = [
+            ("planner", "code_generator"),
             ("code_generator", "validator"),
             ("validator", "tester"),
             ("tester", "security"),
         ]
         self._agents = {
+            "planner": self.planner,
             "code_generator": self.code_generator,
             "validator": self.validator,
             "tester": self.tester,
@@ -54,8 +58,13 @@ class Orchestrator:
         }
 
     def classify_prompt(self, prompt):
-        """Classify whether prompt needs single-file or multi-file generation"""
-        return self.code_generator.classify_prompt(prompt)
+        """Classify whether prompt needs single-file or multi-file generation using the planner"""
+        result = self.planner.classify(prompt)
+        return result.get('mode', 'multi')
+
+    def enhance_prompt(self, prompt, mode='multi'):
+        """Enhance a user prompt with detailed specs using the planner agent"""
+        return self.planner.enhance_prompt(prompt, mode)
 
     def generate_code_stream(self, prompt, mode='multi'):
         """Stream code generation - yields chunks for real-time display"""

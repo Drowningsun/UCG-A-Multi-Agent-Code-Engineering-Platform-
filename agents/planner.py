@@ -30,8 +30,8 @@ Respond in EXACT JSON (no markdown):
 {"mode": "single"} or {"mode": "multi", "reason": "brief reason"}"""
 
         # ── Planner prompt (multi-file) ──
-        self.planner_prompt = """You are an expert software architect. Given a project description, 
-produce a project plan specifying every file that should be created.
+        self.planner_prompt = """You are an expert software architect who designs stunning, production-ready projects.
+Given a project description, produce a project plan specifying every file that should be created.
 
 Rules:
 1. Be pragmatic — only include files that are genuinely needed.
@@ -40,23 +40,33 @@ Rules:
 4. Order files so dependencies come before dependents.
 5. Include a brief purpose for each file.
 6. Specify the language for each file.
+7. For React/JS projects: use Vite (vite.config.js) as the build tool, NOT create-react-app.
+   Always include: index.html (root), vite.config.js, src/main.jsx, package.json.
+8. ALWAYS include dedicated styling files:
+   - A global CSS file with CSS custom properties (design tokens: colors, fonts, spacing)
+   - Component-specific CSS files where needed
+   - Layout CSS file for responsive grid/flex structures
+9. Plan for a minimum of 10 files. Break features into small, focused files.
+10. Include a package.json or requirements.txt with CORRECT, MODERN dependency versions.
 
 Respond in EXACT JSON (no markdown):
 {
   "project_name": "my-project",
   "description": "Brief description",
   "files": [
-    {"path": "README.md", "purpose": "Project documentation", "language": "markdown"},
-    {"path": "requirements.txt", "purpose": "Python dependencies", "language": "text"},
-    {"path": "src/main.py", "purpose": "Application entry point", "language": "python"},
-    {"path": "src/models.py", "purpose": "Data models", "language": "python"},
-    {"path": "src/routes.py", "purpose": "API routes", "language": "python"}
+    {"path": "README.md", "purpose": "Project documentation with setup instructions", "language": "markdown"},
+    {"path": "package.json", "purpose": "Dependencies and scripts (React 18+, Vite)", "language": "json"},
+    {"path": "vite.config.js", "purpose": "Vite build configuration with React plugin", "language": "javascript"},
+    {"path": "index.html", "purpose": "HTML entry point for Vite", "language": "html"},
+    {"path": "src/main.jsx", "purpose": "React 18 entry point with createRoot", "language": "javascript"},
+    {"path": "src/App.jsx", "purpose": "Root application component", "language": "javascript"},
+    {"path": "src/styles/globals.css", "purpose": "Design system: CSS variables, resets, typography", "language": "css"}
   ]
 }"""
 
         # ── Per-file generation prompt ──
-        self.file_gen_prompt = """You are an expert code generator. You are generating ONE specific file 
-that is part of a larger project.
+        self.file_gen_prompt = """You are an elite full-stack developer generating ONE specific file 
+that is part of a larger project. The output MUST be production-quality and visually stunning.
 
 Project context:
 {project_context}
@@ -77,9 +87,65 @@ Rules:
 3. Reference other files in the project using proper import statements.
 4. Follow best practices for the language.
 5. Do NOT wrap in markdown code blocks — output raw code/content only.
-6. Make sure exports/function signatures match what other files expect."""
+6. Make sure exports/function signatures match what other files expect.
+
+STYLING & DESIGN RULES (for UI components and CSS files):
+7. Use React 18 functional components with hooks (useState, useEffect, useCallback).
+8. For CSS files: use CSS custom properties (--color-primary, --color-bg, etc.) for theming.
+9. For components: use modern, polished UI patterns — never raw unstyled HTML.
+10. Add smooth transitions (transition: all 0.2s ease) on interactive elements.
+11. Use proper spacing, rounded corners (border-radius: 8-12px), and box-shadows.
+12. Implement responsive design with media queries.
+13. Use semantic HTML (main, nav, section, article, button) and ARIA labels for accessibility.
+14. For package.json: use React 18+, Vite as build tool. Include all necessary dependencies.
+15. For README.md: include exact terminal commands (npm install, npm run dev) and project overview."""
+
+        # ── Prompt Enhancer prompt ──
+        self.enhancer_prompt = """You are a senior software architect. Given a user's coding request, expand it into a detailed, 
+precise project specification that a code generator can follow exactly.
+
+Your output MUST be a plain text enhanced prompt (NOT JSON, NOT code). It should read like a detailed brief.
+
+Rules:
+1. Detect the appropriate tech stack from the user's request (React, Flask, Express, HTML/CSS/JS, etc.)
+2. For React/JS projects: specify React 18 + Vite build tool, and list the exact npm dependencies needed.
+3. List EVERY file that should be generated, including:
+   - Config files (package.json, vite.config.js, etc.)
+   - Entry points (index.html, src/main.jsx, etc.)
+   - ALL component files
+   - ALL CSS/style files (one per component + a globals.css with CSS custom properties)
+   - Utility/helper files
+   - README.md
+4. For each CSS file listed, note that it MUST actually be generated — never import a file that doesn't exist.
+5. Specify the visual design: modern color palette, Inter font, CSS variables for theming, 
+   smooth transitions, hover effects, responsive design with breakpoints.
+6. Specify functional requirements: error handling, input validation, localStorage/API integration.
+7. Keep your enhanced prompt concise but complete — under 400 words.
+8. DO NOT generate any code. Output only the enhanced text prompt."""
 
     # ────────────────────── Public API ──────────────────────
+
+    def enhance_prompt(self, prompt: str, mode: str = 'multi') -> str:
+        """
+        Enhance a user prompt with detailed specs for better code generation.
+        Only enhances multi-file prompts; single-file prompts pass through unchanged.
+        """
+        if mode == 'single':
+            return prompt
+
+        print(f"✨ Enhancing prompt for multi-file generation...")
+        result = self.call_api(self.enhancer_prompt, prompt, max_tokens=800)
+
+        if result and len(result.strip()) > 50:
+            enhanced = result.strip()
+            # Strip markdown fences if the LLM wrapped it
+            enhanced = self._strip_markdown_fences(enhanced)
+            print(f"✅ Prompt enhanced: {len(prompt)} → {len(enhanced)} chars")
+            return enhanced
+
+        print(f"⚠️ Enhancement failed, using original prompt")
+        return prompt
+
 
     def classify(self, prompt: str) -> dict:
         """

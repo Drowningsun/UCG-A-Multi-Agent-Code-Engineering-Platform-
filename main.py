@@ -154,6 +154,7 @@ Please modify or rewrite the above code according to the user's request."""
         original_code = ""
         all_fixes = []
         workflow_steps = [
+            {"id": "planner", "name": "Planner", "icon": "📋", "status": "pending"},
             {"id": "code_gen", "name": "Code Generator", "icon": "⚡", "status": "pending"},
             {"id": "validator", "name": "Validator", "icon": "✓", "status": "pending"},
             {"id": "testing", "name": "Testing", "icon": "🧪", "status": "pending"},
@@ -161,8 +162,45 @@ Please modify or rewrite the above code according to the user's request."""
         ]
         start_time = time.time()
         
-        # ===== CODE GENERATOR PHASE =====
+        # ===== PLANNER PHASE =====
         workflow_steps[0]["status"] = "active"
+        planner_start_event = AGUIEventBuilder.agent_start(
+            agent_id="planner",
+            agent_name="Planner",
+            message="📋 Analyzing prompt and planning project structure..."
+        )
+        yield planner_start_event.to_sse()
+        yield f"data: {json.dumps({'type': 'workflow_update', 'steps': workflow_steps})}\n\n"
+        
+        planner_start = time.time()
+        
+        # Classify prompt as single-file or multi-file
+        code_mode = orchestrator.classify_prompt(enhanced_prompt)
+        print(f"📋 Prompt classified as: {code_mode}")
+        yield f"data: {json.dumps({'type': 'classification', 'mode': code_mode})}\n\n"
+        
+        # Enhance the prompt for multi-file projects
+        generation_prompt = orchestrator.enhance_prompt(enhanced_prompt, mode=code_mode)
+        
+        planner_duration = time.time() - planner_start
+        workflow_steps[0]["status"] = "complete"
+        workflow_steps[0]["duration"] = round(planner_duration, 2)
+        
+        # Send the enhanced prompt to the frontend
+        if code_mode == 'multi' and generation_prompt != enhanced_prompt:
+            yield f"data: {json.dumps({'type': 'prompt_enhanced', 'original': enhanced_prompt[:200], 'enhanced': generation_prompt[:500]})}\n\n"
+        
+        planner_complete = AGUIEventBuilder.agent_complete(
+            agent_id="planner",
+            agent_name="Planner",
+            message=f"Project classified as {code_mode}-file" + (" — prompt enhanced" if generation_prompt != enhanced_prompt else ""),
+            stats={"mode": code_mode, "duration": round(planner_duration, 2)}
+        )
+        yield planner_complete.to_sse()
+        yield f"data: {json.dumps({'type': 'workflow_update', 'steps': workflow_steps})}\n\n"
+        
+        # ===== CODE GENERATOR PHASE =====
+        workflow_steps[1]["status"] = "active"
         agent_start = AGUIEventBuilder.agent_start(
             agent_id="code_generator",
             agent_name="Code Generator",
@@ -178,13 +216,8 @@ Please modify or rewrite the above code according to the user's request."""
         
         fence_stripped = False  # Track if we already stripped opening fence
         
-        # Classify prompt as single-file or multi-file BEFORE generating
-        code_mode = orchestrator.classify_prompt(enhanced_prompt)
-        print(f"📋 Prompt classified as: {code_mode}")
-        yield f"data: {json.dumps({'type': 'classification', 'mode': code_mode})}\n\n"
-        
-        # Use enhanced_prompt that includes context if available
-        for chunk in orchestrator.generate_code_stream(enhanced_prompt, mode=code_mode):
+        # Use the enhanced prompt for code generation
+        for chunk in orchestrator.generate_code_stream(generation_prompt, mode=code_mode):
             full_code += chunk
             
             # Strip opening markdown fence from very first chunk (e.g. ```python\n)
@@ -228,8 +261,8 @@ Please modify or rewrite the above code according to the user's request."""
         original_code = current_code
         
         # Code generator complete
-        workflow_steps[0]["status"] = "complete"
-        workflow_steps[0]["duration"] = round(gen_duration, 2)
+        workflow_steps[1]["status"] = "complete"
+        workflow_steps[1]["duration"] = round(gen_duration, 2)
         
         gen_complete = AGUIEventBuilder.agent_complete(
             agent_id="code_generator",
@@ -241,7 +274,7 @@ Please modify or rewrite the above code according to the user's request."""
         yield f"data: {json.dumps({'type': 'workflow_update', 'steps': workflow_steps})}\n\n"
         
         # ===== VALIDATOR PHASE =====
-        workflow_steps[1]["status"] = "active"
+        workflow_steps[2]["status"] = "active"
         val_start = time.time()
         
         val_start_event = AGUIEventBuilder.agent_start(
@@ -313,8 +346,8 @@ Please modify or rewrite the above code according to the user's request."""
             }
             yield f"data: {json.dumps(code_update)}\n\n"
         
-        workflow_steps[1]["status"] = "complete"
-        workflow_steps[1]["duration"] = round(val_duration, 2)
+        workflow_steps[2]["status"] = "complete"
+        workflow_steps[2]["duration"] = round(val_duration, 2)
         
         # Rich result event with UI components
         val_result = {
@@ -345,7 +378,7 @@ Please modify or rewrite the above code according to the user's request."""
         yield f"data: {json.dumps({'type': 'workflow_update', 'steps': workflow_steps})}\n\n"
         
         # ===== TESTING PHASE =====
-        workflow_steps[2]["status"] = "active"
+        workflow_steps[3]["status"] = "active"
         test_start = time.time()
         
         test_start_event = AGUIEventBuilder.agent_start(
@@ -414,8 +447,8 @@ Please modify or rewrite the above code according to the user's request."""
             }
             yield f"data: {json.dumps(code_update)}\n\n"
         
-        workflow_steps[2]["status"] = "complete"
-        workflow_steps[2]["duration"] = round(test_duration, 2)
+        workflow_steps[3]["status"] = "complete"
+        workflow_steps[3]["duration"] = round(test_duration, 2)
         
         test_result = {
             'type': 'agent_result',
@@ -445,7 +478,7 @@ Please modify or rewrite the above code according to the user's request."""
         yield f"data: {json.dumps({'type': 'workflow_update', 'steps': workflow_steps})}\n\n"
         
         # ===== SECURITY PHASE =====
-        workflow_steps[3]["status"] = "active"
+        workflow_steps[4]["status"] = "active"
         sec_start = time.time()
         
         sec_start_event = AGUIEventBuilder.agent_start(
@@ -515,8 +548,8 @@ Please modify or rewrite the above code according to the user's request."""
             }
             yield f"data: {json.dumps(code_update)}\n\n"
         
-        workflow_steps[3]["status"] = "complete"
-        workflow_steps[3]["duration"] = round(sec_duration, 2)
+        workflow_steps[4]["status"] = "complete"
+        workflow_steps[4]["duration"] = round(sec_duration, 2)
         
         sec_result = {
             'type': 'agent_result',
@@ -573,7 +606,7 @@ Please modify or rewrite the above code according to the user's request."""
             AGUIBuilder.stat_card("Total Lines", line_count, "📝"),
             AGUIBuilder.stat_card("Fixes Applied", total_fixes, "🔧"),
             AGUIBuilder.stat_card("Duration", f"{round(total_duration, 1)}s", "⏱️"),
-            AGUIBuilder.stat_card("Agents Run", 4, "🤖")
+            AGUIBuilder.stat_card("Agents Run", 5, "🤖")
         ], columns=4).model_dump())
         
         # If code was fixed, add diff component
