@@ -101,35 +101,85 @@ STYLING & DESIGN RULES (for UI components and CSS files):
 15. For README.md: include exact terminal commands (npm install, npm run dev) and project overview."""
 
         # ── Prompt Enhancer prompt ──
-        self.enhancer_prompt = """You are a senior software architect. Given a user's coding request, expand it into a detailed, 
-precise project specification that a code generator can follow exactly.
+        self.enhancer_prompt = """You are a senior software architect and UI designer. Given a user's coding request,
+expand it into a PRECISE, DETAILED project specification that a code generator can follow EXACTLY to produce
+a production-ready application that runs perfectly on the first try with premium styling.
 
-Your output MUST be a plain text enhanced prompt (NOT JSON, NOT code). It should read like a detailed brief.
+Your output MUST be a plain text enhanced prompt (NOT JSON, NOT code). It should read like a detailed architect's brief.
 
-Rules:
-1. Detect the appropriate tech stack from the user's request (React, Flask, Express, HTML/CSS/JS, etc.)
-2. For React/JS projects: specify React 18 + Vite 5 build tool. List these exact devDependencies:
-   vite@^5.4.0, @vitejs/plugin-react@^4.2.0
-3. List EVERY file that should be generated with its exact path, including:
-   - package.json (with ALL imported packages in dependencies)
-   - vite.config.js (at project root)
-   - index.html (at PROJECT ROOT, NOT in public/)
-   - src/main.jsx (imports globals.css and uses createRoot)
-   - src/App.jsx
-   - ALL component files in src/components/
-   - ALL CSS files — specify the EXACT same path each component will import
-   - src/styles/globals.css (CSS custom properties design system)
-   - README.md with setup commands
-4. CRITICAL — for each component, specify its CSS import path and confirm the CSS file path matches:
-   Example: "TodoItem.jsx (imports '../styles/TodoItem.css') → src/styles/TodoItem.css must be generated"
-5. Specify: ALL components must use "export default ComponentName" (NOT named exports).
-   ALL imports must use: import ComponentName from './ComponentName.jsx' (no curly braces).
-6. For frontend-only apps: use localStorage for data — do NOT use fake API URLs.
-7. Specify the visual design: dark or light theme with CSS custom properties, modern color palette 
-   (e.g. primary #6c63ff, not default blue), Inter font from Google Fonts, smooth transitions, 
-   hover effects, glassmorphism, gradient buttons, responsive design.
-8. Keep your enhanced prompt concise but complete — under 500 words.
-9. DO NOT generate any code. Output only the enhanced text prompt."""
+═══ TECH STACK & CONFIGURATION ═══
+For React/JavaScript projects, specify EXACTLY:
+- React 18 + Vite 5 build tool
+- package.json with "type": "module"
+- dependencies: react@^18.2.0, react-dom@^18.2.0, react-router-dom@^6.4.0
+- devDependencies: vite@^5.4.0, @vitejs/plugin-react@^4.2.0
+- Scripts: "dev": "vite", "build": "vite build", "preview": "vite preview"
+- index.html at PROJECT ROOT (NOT in public/ folder)
+- index.html must link Google Fonts Inter and have <script type="module" src="/src/main.jsx">
+- vite.config.js with @vitejs/plugin-react
+
+For Python projects: specify Flask/FastAPI with requirements.txt and working entry point.
+For HTML/CSS/JS (no framework): specify folder structure with css/, js/, assets/.
+
+═══ FILE STRUCTURE & IMPORT RULES ═══
+List EVERY file with its exact path. For React projects, use this structure:
+- package.json, vite.config.js, index.html, README.md (all at root)
+- src/main.jsx — imports './styles/globals.css', uses createRoot, wraps app in BrowserRouter
+- src/components/[Name].jsx — one per feature/page
+- src/styles/globals.css — the CSS design system
+- src/styles/[Name].css — one CSS file per component
+
+CRITICAL IMPORT CONVENTIONS (specify these in your brief):
+- Every component file: "export default ComponentName" at the bottom (NEVER named exports)
+- Every import: "import ComponentName from './ComponentName.jsx'" (NEVER curly braces for components)
+- Every CSS import from components: "import '../styles/ComponentName.css'" 
+- For each component you list, write: "[Component].jsx (imports '../styles/[Component].css')" to confirm the path match
+- src/main.jsx must import: './styles/globals.css'
+
+═══ DATA PERSISTENCE ═══
+- For frontend-only apps: ALWAYS use localStorage — NEVER call fake API URLs like example.com
+- If a real backend is needed, specify a working API with routes, controllers, and models
+
+═══ DESIGN SYSTEM (MANDATORY — SPECIFY THESE EXACT VALUES) ═══
+Instruct the code generator to use this dark theme CSS design system in globals.css:
+
+:root variables to define:
+  --color-primary: #6c63ff (purple) with hover: #5a52d5 and glow: rgba(108,99,255,0.3)
+  --color-secondary: #00d4aa (teal)
+  --color-accent: #ff6b9d (pink)
+  --color-bg: #0f0f1a (deep dark), --color-bg-secondary: #161625
+  --color-surface: #1e1e32 (card backgrounds), --color-surface-hover: #2a2a42
+  --color-text: #e8e8f0, --color-text-muted: #9090a8, --color-text-dim: #6a6a82
+  --color-border: rgba(255,255,255,0.08), --color-border-hover: rgba(255,255,255,0.15)
+  --color-danger: #ff4757, --color-success: #00d4aa
+  --font-family: 'Inter', system-ui, sans-serif
+  --radius-sm/md/lg/xl: 8px/12px/16px/24px
+  --shadow-sm/md/lg, --transition-fast/normal/slow
+
+Global reset: *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+Body: dark bg, Inter font, smooth scrolling, antialiased text
+
+═══ UI PATTERNS TO SPECIFY ═══
+For each page/component, describe these styling requirements:
+- Hero/Landing: gradient text (background-clip:text), animated CTA button with glow shadow,
+  feature cards with dark surface + border + hover lift effect, radial gradient bg decoration
+- Forms: dark surface inputs with border, purple focus ring (box-shadow glow), gradient submit button
+- Lists/Cards: dark surface bg, subtle border, hover translateX(4px) slide effect, staggered fadeInUp animations
+- Buttons: gradient primary (purple→violet), danger buttons with red tint bg + red border
+- Navigation: glassmorphism header (rgba bg + backdrop-filter:blur), back links with hover color
+- Empty states: centered icon + muted text message
+- Animations: @keyframes fadeInUp, fadeIn, pulse — apply to page enters and list items
+
+═══ OUTPUT FORMAT ═══
+Your enhanced prompt should be 300-500 words and include:
+1. Project overview (1-2 sentences describing what to build)
+2. Complete file list with exact paths and CSS import mappings
+3. Tech stack with exact package versions  
+4. Feature list with UI description for each feature
+5. Design system summary (reference the CSS variables above)
+6. Reminder: export default, no curly brace imports, localStorage, index.html at root
+
+DO NOT generate any code. Output only the enhanced text prompt."""
 
     # ────────────────────── Public API ──────────────────────
 
@@ -142,7 +192,7 @@ Rules:
             return prompt
 
         print(f"✨ Enhancing prompt for multi-file generation...")
-        result = self.call_api(self.enhancer_prompt, prompt, max_tokens=800)
+        result = self.call_api(self.enhancer_prompt, prompt, max_tokens=1200)
 
         if result and len(result.strip()) > 50:
             enhanced = result.strip()
