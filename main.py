@@ -9,8 +9,9 @@ from typing import Optional, List
 import json
 import time
 import re
+import os
 
-from config import settings
+from config import settings, key_pool
 from database import connect_to_mongo, close_mongo_connection, SessionDB, MessageDB
 from auth import router as auth_router, get_current_user, get_optional_user
 from orchestrator import Orchestrator
@@ -38,10 +39,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware - use ALLOWED_ORIGINS env var in production
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -88,14 +90,20 @@ async def health_check():
     return {"status": "healthy", "message": "Uber Code Generator API (FastAPI + MongoDB)"}
 
 
+@app.get("/api/key-pool/status")
+async def key_pool_status():
+    """Monitor API key pool health"""
+    return key_pool.get_status()
+
 @app.post("/api/generate")
 async def generate_code(request: GenerateRequest, user: Optional[dict] = Depends(get_optional_user)):
     """Generate code from a prompt (non-streaming)"""
     if not request.prompt:
         raise HTTPException(status_code=400, detail="Prompt is required")
     
-    # Use API key from request or from settings
-    api_key = request.api_key or settings.GROQ_API_KEY
+    # Use API key from request or get a rotated key from the pool
+    from config import key_pool
+    api_key = request.api_key or key_pool.get_key()
     orchestrator = Orchestrator(api_key)
     result = orchestrator.run_workflow(request.prompt)
     
@@ -908,7 +916,7 @@ async def generate_project_name(request: ProjectNameRequest):
             response = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                    "Authorization": f"Bearer {key_pool.get_key()}",
                     "Content-Type": "application/json"
                 },
                 json={

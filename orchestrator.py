@@ -1,7 +1,6 @@
 # Orchestrator for Uber Code Generator
 # Coordinates all AI-powered agents using LangGraph-style workflow
 
-import networkx as nx
 from datetime import datetime
 
 # Import all agents from the agents package
@@ -26,35 +25,31 @@ class Orchestrator:
         self.tester = TestingAgent(api_key)
         self.security = SecurityAgent(api_key)
         
-        # LangGraph-style workflow graph
-        self.workflow_graph = nx.DiGraph()
-        self._build_workflow_graph()
+        # Workflow definition (linear pipeline)
+        self._workflow_nodes = ["code_generator", "validator", "tester", "security"]
+        self._workflow_edges = [
+            ("code_generator", "validator"),
+            ("validator", "tester"),
+            ("tester", "security"),
+        ]
+        self._agents = {
+            "code_generator": self.code_generator,
+            "validator": self.validator,
+            "tester": self.tester,
+            "security": self.security,
+        }
         
         # Memory for storing intermediate results
         self.memory = {}
         self.workflow_history = []
         self.all_fixes = []  # Track all fixes made by agents
 
-    def _build_workflow_graph(self):
-        """Build the LangGraph workflow DAG"""
-        # Add nodes (agents)
-        self.workflow_graph.add_node("code_generator", agent=self.code_generator)
-        self.workflow_graph.add_node("validator", agent=self.validator)
-        self.workflow_graph.add_node("tester", agent=self.tester)
-        self.workflow_graph.add_node("security", agent=self.security)
-        
-        # Add edges (workflow connections)
-        # Code flows: Generator -> Validator -> Tester -> Security
-        self.workflow_graph.add_edge("code_generator", "validator")
-        self.workflow_graph.add_edge("validator", "tester")
-        self.workflow_graph.add_edge("tester", "security")
-
     def get_workflow_info(self):
         """Return workflow graph information"""
         return {
-            "nodes": list(self.workflow_graph.nodes()),
-            "edges": list(self.workflow_graph.edges()),
-            "execution_order": list(nx.topological_sort(self.workflow_graph)),
+            "nodes": self._workflow_nodes,
+            "edges": self._workflow_edges,
+            "execution_order": self._workflow_nodes,
             "agent_info": AGENT_INFO
         }
 

@@ -99,55 +99,86 @@ CRITICAL OUTPUT FORMAT RULES:
         return '\n'.join(lines)
     
     def generate_stream(self, prompt, mode='multi'):
-        """Streaming code generation - yields chunks"""
+        """Streaming code generation - yields chunks with automatic key rotation on rate limits"""
+        from config import key_pool
+        import time
+        
         # Use the appropriate prompt based on classification
         active_prompt = self.single_file_prompt if mode == 'single' else self.multi_file_prompt
-        try:
-            response = requests.post(
-                GROQ_BASE_URL,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": MODEL,
-                    "messages": [
-                        {"role": "system", "content": active_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": 8000,
-                    "stream": True
-                },
-                stream=True,
-                timeout=120
-            )
-            
-            if response.status_code == 200:
-                for line in response.iter_lines():
-                    if line:
-                        line = line.decode('utf-8')
-                        if line.startswith('data: '):
-                            data = line[6:]
-                            if data == '[DONE]':
-                                break
-                            try:
-                                chunk = json.loads(data)
-                                if 'choices' in chunk and len(chunk['choices']) > 0:
-                                    delta = chunk['choices'][0].get('delta', {})
-                                    content = delta.get('content', '')
-                                    if content:
-                                        yield content
-                            except json.JSONDecodeError:
-                                continue
-            else:
-                print(f"Stream Error: {response.status_code}")
+        max_retries = 3
+        current_key = self.api_key
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"🔄 Streaming with key ...{current_key[-8:]} (attempt {attempt + 1}/{max_retries})")
+                response = requests.post(
+                    GROQ_BASE_URL,
+                    headers={
+                        "Authorization": f"Bearer {current_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": MODEL,
+                        "messages": [
+                            {"role": "system", "content": active_prompt},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 8000,
+                        "stream": True
+                    },
+                    stream=True,
+                    timeout=120
+                )
+                
+                if response.status_code == 200:
+                    for line in response.iter_lines():
+                        if line:
+                            line = line.decode('utf-8')
+                            if line.startswith('data: '):
+                                data = line[6:]
+                                if data == '[DONE]':
+                                    break
+                                try:
+                                    chunk = json.loads(data)
+                                    if 'choices' in chunk and len(chunk['choices']) > 0:
+                                        delta = chunk['choices'][0].get('delta', {})
+                                        content = delta.get('content', '')
+                                        if content:
+                                            yield content
+                                except json.JSONDecodeError:
+                                    continue
+                    return  # Success — exit the retry loop
+                elif response.status_code == 429:
+                    # Rate limited — rotate key and retry
+                    key_pool.mark_rate_limited(current_key)
+                    current_key = key_pool.get_key()
+                    self.api_key = current_key
+                    wait_time = min(2 ** attempt, 5)
+                    print(f"⏳ Stream rate-limited. Rotating to key ...{current_key[-8:]}, waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                elif response.status_code in (401, 403):
+                    # Bad key — rotate and retry
+                    key_pool.mark_rate_limited(current_key)
+                    current_key = key_pool.get_key()
+                    self.api_key = current_key
+                    continue
+                else:
+                    print(f"Stream Error: {response.status_code}")
+                    for chunk in self._mock_stream(prompt):
+                        yield chunk
+                    return
+            except Exception as e:
+                print(f"Stream Error: {e}")
                 for chunk in self._mock_stream(prompt):
                     yield chunk
-        except Exception as e:
-            print(f"Stream Error: {e}")
-            for chunk in self._mock_stream(prompt):
-                yield chunk
+                return
+        
+        # All retries exhausted
+        print(f"❌ Stream: All {max_retries} retry attempts exhausted")
+        for chunk in self._mock_stream(prompt):
+            yield chunk
     
     def _mock_stream(self, prompt):
         """Mock streaming for fallback"""
