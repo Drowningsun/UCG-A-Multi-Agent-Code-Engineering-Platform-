@@ -152,7 +152,48 @@ SECTION 5: CODE QUALITY
 3. Include error handling (try/catch for storage, API calls, etc.).
 4. Input validation on all forms.
 5. Accessible markup: proper labels, ARIA attributes, semantic HTML (main, nav, section, article).
-6. Each file must be complete and functional — no placeholder "TODO" comments."""
+6. Each file must be complete and functional — no placeholder "TODO" comments.
+
+═══════════════════════════════════════════
+SECTION 6: COMMON MISTAKES — YOU MUST AVOID THESE
+═══════════════════════════════════════════
+These are CRITICAL errors that WILL break the app. Check every file against this list:
+
+IMPORT/EXPORT CONSISTENCY:
+- ALWAYS use "export default ComponentName" at the bottom of every component file.
+- ALWAYS import with: import ComponentName from './ComponentName.jsx'
+- NEVER use named exports like "export { ComponentName }" for React components.
+- NEVER import with curly braces: import { ComponentName } from './ComponentName' — THIS WILL BREAK.
+- Double-check EVERY import statement matches the actual export of the target file.
+
+CSS FILE LOCATIONS:
+- If a component imports './Foo.css', the file Foo.css MUST exist in the SAME directory as the component.
+- If you put CSS files in src/styles/, then components MUST import '../styles/Foo.css' (NOT './Foo.css').
+- PICK ONE PATTERN and be consistent across ALL files:
+  Option A: CSS next to components → src/components/Foo.jsx imports './Foo.css', src/components/Foo.css exists
+  Option B: CSS in styles folder → src/components/Foo.jsx imports '../styles/Foo.css', src/styles/Foo.css exists
+- NEVER import a CSS file that doesn't exist. Every CSS import MUST have a matching generated file.
+
+VITE PROJECT STRUCTURE:
+- index.html must be at the PROJECT ROOT (next to package.json), NOT inside public/.
+- package.json: vite and @vitejs/plugin-react go in "devDependencies", NOT "dependencies".
+- Use COMPATIBLE version pairs: vite@^5.4.0 + @vitejs/plugin-react@^4.2.0 (these work together).
+- Do NOT mix old versions (vite@^3 with plugin-react@^2 — this causes peer dependency errors).
+
+DATA & STATE:
+- For frontend-only apps, use localStorage for data persistence — do NOT call fake API URLs like "https://example.com/api".
+- If the user asks for an API backend, generate a real working backend. Otherwise, use localStorage.
+
+PACKAGE.JSON CORRECTNESS:
+- Include ALL packages that are imported anywhere in the code.
+- If any file imports 'react-router-dom', it MUST be in dependencies.
+- If any file imports 'framer-motion', 'lucide-react', etc., they MUST be in dependencies.
+- Scripts: "dev": "vite", "build": "vite build", "preview": "vite preview"
+
+GLOBAL CSS IMPORT:
+- The global CSS file (with CSS variables/design tokens) MUST be imported in src/main.jsx:
+  import './styles/globals.css'
+- Do NOT rely on index.html to link the CSS — Vite handles CSS through JS imports."""
 
         # Default system_prompt (for backward compat)
         self.system_prompt = self.multi_file_prompt

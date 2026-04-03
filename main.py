@@ -916,43 +916,51 @@ async def generate_project_name(request: ProjectNameRequest):
         return {"project_name": "generated-code"}
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {key_pool.get_key()}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "Generate a very short project name (2-3 words max) in kebab-case (lowercase, hyphen-separated) "
-                                "for a coding project based on the user's request. "
-                                "Examples: 'api-retry-handler', 'auth-system', 'rate-limiter', 'todo-app', 'db-pool-manager'. "
-                                "Return ONLY the kebab-case name, nothing else. No quotes, no explanation."
-                            )
+        timeout = httpx.Timeout(connect=10.0, read=15.0, write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            # Retry up to 3 times with different API keys
+            for attempt in range(3):
+                try:
+                    response = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {key_pool.get_key()}",
+                            "Content-Type": "application/json"
                         },
-                        {
-                            "role": "user",
-                            "content": f"User's request: {prompt_text[:500]}"
+                        json={
+                            "model": "llama-3.3-70b-versatile",
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        "Generate a very short project name (2-3 words max) in kebab-case (lowercase, hyphen-separated) "
+                                        "for a coding project based on the user's request. "
+                                        "Examples: 'api-retry-handler', 'auth-system', 'rate-limiter', 'todo-app', 'db-pool-manager'. "
+                                        "Return ONLY the kebab-case name, nothing else. No quotes, no explanation."
+                                    )
+                                },
+                                {
+                                    "role": "user",
+                                    "content": f"User's request: {prompt_text[:500]}"
+                                }
+                            ],
+                            "temperature": 0.3,
+                            "max_tokens": 20
                         }
-                    ],
-                    "temperature": 0.3,
-                    "max_tokens": 20
-                }
-            )
-
-            response.raise_for_status()  # Raise on 4xx/5xx so the except block catches it with a real message
-            data = response.json()
-            name = data["choices"][0]["message"]["content"].strip().strip('"').strip("'").strip()
-            # Sanitize: ensure kebab-case, no special chars
-            name = re.sub(r'[^a-z0-9\-]', '', name.lower().replace(' ', '-'))
-            name = re.sub(r'-+', '-', name).strip('-')
-            if name:
-                return {"project_name": name[:40]}
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    name = data["choices"][0]["message"]["content"].strip().strip('"').strip("'").strip()
+                    # Sanitize: ensure kebab-case, no special chars
+                    name = re.sub(r'[^a-z0-9\-]', '', name.lower().replace(' ', '-'))
+                    name = re.sub(r'-+', '-', name).strip('-')
+                    if name:
+                        return {"project_name": name[:40]}
+                    break
+                except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError) as timeout_err:
+                    print(f"⚠️ Project name gen attempt {attempt+1}/3 failed: {type(timeout_err).__name__}")
+                    if attempt == 2:
+                        raise
     except Exception as e:
         print(f"Error generating project name ({type(e).__name__}): {repr(e)}")
 

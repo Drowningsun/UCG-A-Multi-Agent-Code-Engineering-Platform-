@@ -108,20 +108,28 @@ Your output MUST be a plain text enhanced prompt (NOT JSON, NOT code). It should
 
 Rules:
 1. Detect the appropriate tech stack from the user's request (React, Flask, Express, HTML/CSS/JS, etc.)
-2. For React/JS projects: specify React 18 + Vite build tool, and list the exact npm dependencies needed.
-3. List EVERY file that should be generated, including:
-   - Config files (package.json, vite.config.js, etc.)
-   - Entry points (index.html, src/main.jsx, etc.)
-   - ALL component files
-   - ALL CSS/style files (one per component + a globals.css with CSS custom properties)
-   - Utility/helper files
-   - README.md
-4. For each CSS file listed, note that it MUST actually be generated — never import a file that doesn't exist.
-5. Specify the visual design: modern color palette, Inter font, CSS variables for theming, 
-   smooth transitions, hover effects, responsive design with breakpoints.
-6. Specify functional requirements: error handling, input validation, localStorage/API integration.
-7. Keep your enhanced prompt concise but complete — under 400 words.
-8. DO NOT generate any code. Output only the enhanced text prompt."""
+2. For React/JS projects: specify React 18 + Vite 5 build tool. List these exact devDependencies:
+   vite@^5.4.0, @vitejs/plugin-react@^4.2.0
+3. List EVERY file that should be generated with its exact path, including:
+   - package.json (with ALL imported packages in dependencies)
+   - vite.config.js (at project root)
+   - index.html (at PROJECT ROOT, NOT in public/)
+   - src/main.jsx (imports globals.css and uses createRoot)
+   - src/App.jsx
+   - ALL component files in src/components/
+   - ALL CSS files — specify the EXACT same path each component will import
+   - src/styles/globals.css (CSS custom properties design system)
+   - README.md with setup commands
+4. CRITICAL — for each component, specify its CSS import path and confirm the CSS file path matches:
+   Example: "TodoItem.jsx (imports '../styles/TodoItem.css') → src/styles/TodoItem.css must be generated"
+5. Specify: ALL components must use "export default ComponentName" (NOT named exports).
+   ALL imports must use: import ComponentName from './ComponentName.jsx' (no curly braces).
+6. For frontend-only apps: use localStorage for data — do NOT use fake API URLs.
+7. Specify the visual design: dark or light theme with CSS custom properties, modern color palette 
+   (e.g. primary #6c63ff, not default blue), Inter font from Google Fonts, smooth transitions, 
+   hover effects, glassmorphism, gradient buttons, responsive design.
+8. Keep your enhanced prompt concise but complete — under 500 words.
+9. DO NOT generate any code. Output only the enhanced text prompt."""
 
     # ────────────────────── Public API ──────────────────────
 
