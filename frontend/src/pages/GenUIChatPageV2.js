@@ -1203,13 +1203,50 @@ const GenUIChatPageV2 = () => {
         {/* Messages */}
         <div className="messages-container">
           {messages.length === 0 && !loading && (
-            <div className="welcome-screen">
-              <div className="welcome-content">
+            <div className="welcome-screen welcome-centered">
+              {/* Ambient glow behind the orb */}
+              <div className="welcome-ambient-glow" />
+              <div className="welcome-ambient-glow-inner" />
+
+              {/* 1. God Particle Orb — negative margin so prompt overlaps it */}
+              <div className="welcome-orb-wrapper">
                 <Suspense fallback={<OrbFallback />}>
-                  <GodParticleOrb size={420} />
+                  <GodParticleOrb size={500} />
                 </Suspense>
+              </div>
+
+              {/* 2. Full-width glass pill prompt bar — overlaps the orb bottom */}
+              <div className="glass-prompt-wrapper">
+                <div className="glass-prompt-glow" />
+                <div className="glass-prompt-overlay">
+                  <div className="glass-prompt-shine" />
+                  <div className="glass-prompt-volume" />
+                  <form onSubmit={handleSubmit} className="glass-prompt-form">
+                    <input
+                      type="text"
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder="Describe what you want to build..."
+                      disabled={loading}
+                      className="glass-prompt-input"
+                    />
+                    <button type="submit" disabled={!prompt.trim()} className="glass-prompt-btn">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* 3. Title + subtitle + badge below */}
+              <div className="welcome-text-below">
                 <h2>Uber Code Generator</h2>
                 <p className="welcome-subtitle">Describe what you want to build. 4 AI agents will generate, validate, test, and secure your code.</p>
+                <div className="welcome-powered-badge">
+                  <span className="powered-dot" />
+                  <span>Powered by Llama 3.3 via Groq</span>
+                </div>
               </div>
             </div>
           )}
@@ -1345,28 +1382,30 @@ const GenUIChatPageV2 = () => {
           </div>
         </div>
 
-        {/* Input */}
-        <div className="input-container">
-          <form onSubmit={handleSubmit} className="input-form">
-            <input
-              type="text"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the code you want to generate..."
-              disabled={loading}
-            />
-            {loading ? (
-              <button type="button" className="terminate-btn" onClick={handleTerminate} title="Stop generation">
-                <div className="stop-icon" />
-              </button>
-            ) : (
-              <button type="submit" disabled={!prompt.trim()}>
-                <span>→</span>
-              </button>
-            )}
-          </form>
-          <p className="input-hint">Powered by Llama 3.3 via Groq • 4 AI Agents</p>
-        </div>
+        {/* Input - only show at bottom when there are messages or actively loading */}
+        {(messages.length > 0 || loading) && (
+          <div className="input-container">
+            <form onSubmit={handleSubmit} className="input-form">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe the code you want to generate..."
+                disabled={loading}
+              />
+              {loading ? (
+                <button type="button" className="terminate-btn" onClick={handleTerminate} title="Stop generation">
+                  <div className="stop-icon" />
+                </button>
+              ) : (
+                <button type="submit" disabled={!prompt.trim()}>
+                  <span>→</span>
+                </button>
+              )}
+            </form>
+            <p className="input-hint">Powered by Llama 3.3 via Groq • 4 AI Agents</p>
+          </div>
+        )}
       </main>
 
       {/* Right Panel - Results */}

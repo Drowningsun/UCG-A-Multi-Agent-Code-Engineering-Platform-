@@ -10,6 +10,18 @@ import SpotlightCard from '../components/SpotlightCard';
 import { UCGLogo } from './LandingPage';
 import './DashboardPage.css';
 
+const IconSunDash = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+);
+
+const IconMoonDash = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+);
+
 // --- Custom SVG Dashboard Icons ---
 const IconBarChart = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -113,6 +125,16 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedSessions, setSelectedSessions] = useState(new Set());
+
+  // Theme state — synced with landing page and chat via localStorage
+  const [theme, setTheme] = useState(() => localStorage.getItem('ucg-theme') || 'dark');
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('ucg-theme', next);
+      return next;
+    });
+  }, []);
 
   // Confirm modal state
   const [confirmModal, setConfirmModal] = useState({
@@ -276,7 +298,7 @@ const DashboardPage = () => {
   ];
 
   return (
-    <div className="dashboard-page">
+    <div className={`dashboard-page ${theme === 'light' ? 'dashboard-light' : ''}`}>
       <ParticleNetwork />
       {/* Header */}
       <header className="dashboard-header">
@@ -286,6 +308,9 @@ const DashboardPage = () => {
             <span>Uber Code Generator</span>
           </Link>
           <nav className="nav">
+            <button className="theme-toggle-dash" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+              {theme === 'dark' ? <IconSunDash /> : <IconMoonDash />}
+            </button>
             <Link to="/chat" className="btn btn-primary">New Generation</Link>
             {user && <UserMenu />}
           </nav>
@@ -304,7 +329,11 @@ const DashboardPage = () => {
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
                   <div className="stat-icon"><IconBarChart /></div>
                   <div className="stat-info">
-                    <span className="stat-value"><AnimatedCounter value={sessions.length} duration={800} /></span>
+                    {loading ? (
+                      <span className="stat-value"><span className="stat-skeleton" /></span>
+                    ) : (
+                      <span className="stat-value"><AnimatedCounter value={sessions.length} duration={800} /></span>
+                    )}
                     <span className="stat-label">Total Sessions</span>
                   </div>
                 </SpotlightCard>
@@ -313,7 +342,11 @@ const DashboardPage = () => {
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
                   <div className="stat-icon"><IconChatBubble /></div>
                   <div className="stat-info">
-                    <span className="stat-value"><AnimatedCounter value={sessions.filter(s => s.message_count > 0).length} duration={800} /></span>
+                    {loading ? (
+                      <span className="stat-value"><span className="stat-skeleton" /></span>
+                    ) : (
+                      <span className="stat-value"><AnimatedCounter value={sessions.filter(s => s.message_count > 0).length} duration={800} /></span>
+                    )}
                     <span className="stat-label">Active Chats</span>
                   </div>
                 </SpotlightCard>
@@ -322,7 +355,11 @@ const DashboardPage = () => {
                 <SpotlightCard className="stat-card" spotlightColor="rgba(249, 115, 22, 0.15)">
                   <div className="stat-icon"><IconSparkles /></div>
                   <div className="stat-info">
-                    <span className="stat-value"><AnimatedCounter value={sessions.reduce((acc, s) => acc + (s.message_count || 0), 0)} duration={1200} /></span>
+                    {loading ? (
+                      <span className="stat-value"><span className="stat-skeleton" /></span>
+                    ) : (
+                      <span className="stat-value"><AnimatedCounter value={sessions.reduce((acc, s) => acc + (s.message_count || 0), 0)} duration={1200} /></span>
+                    )}
                     <span className="stat-label">Total Messages</span>
                   </div>
                 </SpotlightCard>
