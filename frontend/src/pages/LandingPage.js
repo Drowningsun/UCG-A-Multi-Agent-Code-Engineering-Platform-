@@ -164,7 +164,7 @@ const RotatingPromptTypewriter = () => {
     if(del){t=text.length>0?setTimeout(()=>setText(text.slice(0,-1)),20):undefined;if(text.length===0){setDel(false);setIdx(p=>(p+1)%prompts.length);}}
     else{t=text.length<cur.length?setTimeout(()=>setText(cur.slice(0,text.length+1)),40):setTimeout(()=>setDel(true),2000);}
     return()=>clearTimeout(t);
-  },[text,del,idx]);
+  },[text,del,idx,prompts]);
   return <div className="relative font-mono text-sm sm:text-base md:text-xl lg:text-2xl text-left inline-flex"><span className="text-indigo-600 dark:text-indigo-300 font-semibold">{text}</span><span className="animate-blink text-indigo-500 dark:text-indigo-400 font-light -ml-1">|</span></div>;
 };
 
